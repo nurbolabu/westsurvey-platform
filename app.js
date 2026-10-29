@@ -105,7 +105,7 @@
   }
 
   // Доступ только по приглашению WestSurvey: открытой регистрации нет.
-  // Вход по почте и паролю или по одноразовому коду из SMS; новый участник отправляет запрос доступа.
+  // Вход по почте и паролю; новый участник отправляет запрос доступа.
   // 3D-рельеф с дорогой: поверхность строится рядами от дальнего к ближнему,
   // дорога рисуется между рядами, поэтому холмы перекрывают её как в перспективе.
   function loginHero() {
@@ -164,12 +164,17 @@
   }
 
   function renderLogin() {
-    let mode = 'password';
     root.innerHTML = `
       <div class="auth">
         <section class="auth-hero">
           ${loginHero()}
-          <div class="auth-top"><img class="auth-logo" src="assets/logo-kcs-light.png" alt="Kazcomservice"></div>
+          <div class="auth-top">
+            <div class="logo-plate">
+              <img src="assets/logo-ws.png" alt="WestSurvey">
+              <span class="logo-sep" aria-hidden="true"></span>
+              <img src="assets/logo-kcs.png" alt="Kazcomservice">
+            </div>
+          </div>
           <div class="auth-hero-copy">
             <h1>Ваш объект под контролем на&nbsp;каждом пикете</h1>
             <p>Карта трассы, объёмы по слоям, подрядчики, геодезия и лаборатория. Данные вносят на объекте, WestSurvey проверяет и показывает их вам.</p>
@@ -198,21 +203,10 @@
         ${brand}
         <h2>Вход в кабинет объекта</h2>
         <p class="sub">Доступ выдаёт WestSurvey. Войдите с данными из приглашения.</p>
-        <div class="auth-switch" role="tablist" aria-label="Способ входа">
-          <button role="tab" data-mode="password" aria-selected="${mode === 'password'}">По паролю</button>
-          <button role="tab" data-mode="code" aria-selected="${mode === 'code'}">По коду из SMS</button>
-        </div>
         <form class="login-form" novalidate>
-          ${mode === 'password' ? `
-            <label class="field"><span>Электронная почта</span><input name="login" type="email" autocomplete="username" placeholder="name@company.kz" value="demo@westsurvey.kz"></label>
-            <label class="field pass"><span>Пароль</span><input name="secret" type="password" autocomplete="current-password" placeholder="Пароль" value="demo-access"><button type="button" class="eye" aria-label="Показать пароль">${I.eye}</button></label>
-            <button type="button" class="link-btn" id="forgot">Забыли пароль?</button>`
-          : `
-            <label class="field"><span>Номер телефона</span><input name="login" type="tel" autocomplete="tel" placeholder="+7 7__ ___ __ __" value="+7 701 000 00 00"></label>
-            <div class="code-row">
-              <label class="field"><span>Код из SMS</span><input name="secret" inputmode="numeric" autocomplete="one-time-code" placeholder="4 цифры" maxlength="6"></label>
-              <button type="button" class="btn ghost" id="sendCode">Получить код</button>
-            </div>`}
+          <label class="field"><span>Электронная почта</span><input name="login" type="email" autocomplete="username" placeholder="name@company.kz" value="demo@westsurvey.kz"></label>
+          <label class="field pass"><span>Пароль</span><input name="secret" type="password" autocomplete="current-password" placeholder="Пароль" value="demo-access"><button type="button" class="eye" aria-label="Показать пароль">${I.eye}</button></label>
+          <button type="button" class="link-btn" id="forgot">Забыли пароль?</button>
           <div class="err" aria-live="polite"></div>
           <button class="btn" type="submit">Войти</button>
         </form>
@@ -225,7 +219,6 @@
           ${ROLES.map((r) => `<button type="button" class="demo-chip" data-demo="${r.id}">${r.name}</button>`).join('')}
         </div>`;
 
-      $$('[data-mode]', box).forEach((b) => b.addEventListener('click', () => { mode = b.dataset.mode; showLogin(); }));
       $$('[data-demo]', box).forEach((b) => b.addEventListener('click', () => signIn(b.dataset.demo)));
       $('#toRequest').addEventListener('click', showRequest);
       $('.eye', box)?.addEventListener('click', (e) => {
@@ -233,8 +226,7 @@
         inp.type = inp.type === 'password' ? 'text' : 'password';
         e.currentTarget.setAttribute('aria-label', inp.type === 'password' ? 'Показать пароль' : 'Скрыть пароль');
       });
-      $('#forgot')?.addEventListener('click', () => { mode = 'code'; showLogin(); toast('Войдите по коду из SMS, затем задайте новый пароль в профиле'); });
-      $('#sendCode')?.addEventListener('click', () => toast('Прототип: подойдёт любой код из 4 цифр'));
+      $('#forgot').addEventListener('click', showReset);
 
       const form = $('.login-form', box);
       form.addEventListener('submit', (e) => {
@@ -242,11 +234,35 @@
         const err = $('.err', form);
         const login = form.login.value.trim();
         const secret = form.secret.value.trim();
-        if (mode === 'password' && !/^\S+@\S+\.\S+$/.test(login)) { err.textContent = 'Введите почту в формате name@company.kz'; return; }
-        if (mode === 'code' && login.replace(/\D/g, '').length < 11) { err.textContent = 'Введите номер телефона полностью'; return; }
-        if (mode === 'password' && secret.length < 4) { err.textContent = 'Введите пароль'; return; }
-        if (mode === 'code' && !/^\d{4,6}$/.test(secret)) { err.textContent = 'Введите код из SMS, 4–6 цифр'; return; }
-        signIn('customer', login.startsWith('demo@') || mode === 'code' ? 'Демо пользователь' : login.split('@')[0]);
+        if (!/^\S+@\S+\.\S+$/.test(login)) { err.textContent = 'Введите почту в формате name@company.kz'; return; }
+        if (secret.length < 4) { err.textContent = 'Введите пароль'; return; }
+        signIn('customer', login.startsWith('demo@') ? 'Демо пользователь' : login.split('@')[0]);
+      });
+    }
+
+    function showReset() {
+      box.innerHTML = `
+        <button type="button" class="link-btn back" id="toLogin">${I.back}Ко входу</button>
+        <h2>Восстановление пароля</h2>
+        <p class="sub">Укажите почту, на которую пришло приглашение. Мы отправим ссылку, по ней вы зададите новый пароль.</p>
+        <form class="login-form" id="resetForm" novalidate>
+          <label class="field"><span>Электронная почта</span><input name="email" type="email" autocomplete="username" placeholder="name@company.kz"></label>
+          <div class="err" aria-live="polite"></div>
+          <button class="btn" type="submit">Отправить ссылку</button>
+        </form>`;
+      $('#toLogin').addEventListener('click', showLogin);
+      $('#resetForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const v = e.target.email.value.trim();
+        if (!/^\S+@\S+\.\S+$/.test(v)) { $('.err', e.target).textContent = 'Введите почту в формате name@company.kz'; return; }
+        box.innerHTML = `
+          <div class="sent">
+            <span class="sent-ico">${I.check}</span>
+            <h2>Проверьте почту</h2>
+            <p class="sub">Если ${esc(v)} есть в списке участников объекта, на неё придёт ссылка для нового пароля.</p>
+            <button type="button" class="btn ghost" id="toLogin">Вернуться ко входу</button>
+          </div>`;
+        $('#toLogin').addEventListener('click', showLogin);
       });
     }
 
@@ -255,14 +271,14 @@
         ${brand}
         <button type="button" class="link-btn back" id="toLogin">${I.back}Ко входу</button>
         <h2>Запрос доступа к объекту</h2>
-        <p class="sub">WestSurvey проверит запрос и пришлёт приглашение на почту или по SMS. Обычно в течение рабочего дня.</p>
+        <p class="sub">WestSurvey проверит запрос и пришлёт приглашение на почту. Обычно в течение рабочего дня.</p>
         <form class="login-form" id="reqForm">
           <label class="field"><span>Фамилия и имя</span><input name="name" autocomplete="name" required></label>
           <label class="field"><span>Организация</span><input name="org" autocomplete="organization" placeholder="Например, Kazcomservice" required></label>
           <label class="field"><span>Роль на объекте</span>
             <select name="role">${ROLES.map((r) => `<option value="${r.id}">${r.name}: ${r.desc.toLowerCase()}</option>`).join('')}</select>
           </label>
-          <label class="field"><span>Телефон или почта</span><input name="contact" autocomplete="email" required></label>
+          <label class="field"><span>Электронная почта</span><input name="contact" type="email" autocomplete="email" required></label>
           <div class="err" aria-live="polite"></div>
           <button class="btn" type="submit">Отправить запрос</button>
         </form>`;

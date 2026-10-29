@@ -1015,3 +1015,15 @@ fieldset.field legend { font-size: 13px; font-weight: 600; margin-bottom: 8px; c
   .auth-hero { min-height: 340px; }
 }
 .auth-hero-copy { margin-bottom: 24px; }
+.logo-plate { display: inline-flex; align-items: center; background: #fff; border-radius: 14px; padding: 8px 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, .25); }
+.logo-plate .logos { gap: 14px; }
+.logo-plate .logo-box, .logo-plate .logo-box img, .logo-plate .logo-box.ws img { height: 36px; }
+.logo-plate .logo-box.ws b { color: var(--ink); }
+@media (max-width: 960px) {
+  .logo-plate { padding: 6px 12px; border-radius: 12px; }
+  .logo-plate .logo-box, .logo-plate .logo-box img, .logo-plate .logo-box.ws img { height: 28px; }
+}
+.logo-plate { gap: 16px; padding: 10px 18px; }
+.logo-plate img { height: 44px; width: auto; display: block; }
+.logo-plate .logo-sep { height: 30px; }
+@media (max-width: 960px) { .logo-plate { padding: 7px 14px; gap: 12px; } .logo-plate img { height: 34px; } .logo-plate .logo-sep { height: 24px; } }
