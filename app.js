@@ -182,7 +182,6 @@
         </section>
 
         <section class="auth-panel">
-          <div class="auth-top"><div class="auth-brand"><img class="auth-logo" src="assets/logo-ws.png" alt=""><b>WESTSURVEY</b></div></div>
           <div class="auth-box" id="authBox"></div>
           <footer class="auth-foot">WestSurvey, геодезическое сопровождение строительства</footer>
         </section>
