@@ -998,3 +998,19 @@ fieldset.field legend { font-size: 13px; font-weight: 600; margin-bottom: 8px; c
 }
 @media (prefers-reduced-motion: reduce) { .road-line, .road-ticks, .road-pins circle { animation: none; } }
 @media (max-width: 960px) { .auth-hero-copy p { display: none; } }
+
+/* v8: вход, логотипы на одной линии, 3D-рельеф */
+.auth-hero { padding-top: 0; }
+.auth-top { height: 104px; display: flex; align-items: center; flex: none; }
+.auth-logo { height: 40px; width: auto; display: block; }
+.auth-panel { justify-content: flex-start; padding-top: 0; }
+.auth-panel .auth-top { width: 100%; max-width: 390px; }
+.auth-panel .auth-brand { margin: 0; }
+.auth-box { margin: auto 0; }
+.hero-art .terrain { animation: none; }
+.object-card { border-left-width: 0; padding: 16px 20px; }
+@media (max-width: 960px) {
+  .auth-top { height: 72px; }
+  .auth-logo { height: 32px; }
+  .auth-hero { min-height: 340px; }
+}

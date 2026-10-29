@@ -106,18 +106,61 @@
 
   // Доступ только по приглашению WestSurvey: открытой регистрации нет.
   // Вход по почте и паролю или по одноразовому коду из SMS; новый участник отправляет запрос доступа.
+  // 3D-рельеф с дорогой: поверхность строится рядами от дальнего к ближнему,
+  // дорога рисуется между рядами, поэтому холмы перекрывают её как в перспективе.
   function loginHero() {
-    const road = 'M -40 470 C 110 455, 190 370, 320 335 S 500 330, 590 235 S 720 105, 960 70';
+    const W = 900, H = 900, cx = 450, horizon = 120, f = 560, d = 1.4, camH = 1.25;
+    const roadX = (z) => 0.75 * Math.sin(z * 0.85 + 0.4) - 0.15;
+    const g = (x, z, x0, z0, s) => Math.exp(-((x - x0) ** 2 + (z - z0) ** 2) / s);
+    const hRaw = (x, z) => 0.55 * g(x, z, 1.5, 3.6, 1.1) + 0.75 * g(x, z, -1.9, 4.8, 1.6) + 0.32 * g(x, z, 0.4, 6.4, 1.4)
+      + 0.22 * g(x, z, -1.2, 1.6, 0.6) + 0.05 * Math.sin(x * 3.1 + z * 1.7) + 0.04 * Math.cos(x * 5.3 - z * 2.2);
+    // полотно дороги срезано в рельефе: насыпь ровная, склоны плавно переходят в неё
+    const h = (x, z) => { const k = Math.exp(-((x - roadX(z)) ** 2) / 0.08); return hRaw(x, z) * (1 - 0.75 * k) + hRaw(roadX(z), z) * 0.25 * k; };
+    const P = (x, y, z) => { const s = f / (z + d); return [cx + x * s, horizon + (camH - y) * s]; };
+    const fmt = (pts) => pts.map(([a, b]) => `${a.toFixed(1)},${b.toFixed(1)}`).join(' ');
+
+    const zFar = 8, zNear = 0, rows = 40, cols = 70, xSpan = 3.2;
+    const zs = Array.from({ length: rows + 1 }, (_, r) => zFar - ((zFar - zNear) * r) / rows);
+    let out = '';
+    zs.forEach((z, r) => {
+      const t = r / rows;
+      const row = [];
+      for (let c = 0; c <= cols; c++) {
+        const x = -xSpan + (2 * xSpan * c) / cols;
+        row.push(P(x, h(x, z), z));
+      }
+      const fill = mixHex('#0d2b86', '#0a1f5c', t);
+      out += `<polygon points="${fmt(row)} ${row[row.length - 1][0].toFixed(1)},${H} ${row[0][0].toFixed(1)},${H}" fill="${fill}"/>`;
+      out += `<polyline points="${fmt(row)}" fill="none" stroke="rgba(130,170,255,${(0.22 + 0.4 * (1 - t)).toFixed(2)})" stroke-width="${(0.8 + 0.9 * t).toFixed(2)}"/>`;
+      // участок дороги между этим и следующим (ближним) рядом
+      if (r < rows) {
+        const z1 = z, z0 = zs[r + 1], n = 4, w = 0.11;
+        const L = [], R = [], C = [];
+        for (let k = 0; k <= n; k++) {
+          const zz = z1 + ((z0 - z1) * k) / n, xr = roadX(zz), y = h(xr, zz) + 0.012;
+          L.push(P(xr - w, y, zz)); R.push(P(xr + w, y, zz)); C.push(P(xr, y + 0.002, zz));
+        }
+        out += `<polygon points="${fmt(L)} ${fmt(R.reverse())}" fill="#dfe8fb" stroke="#e9f0ff" stroke-width="0.6"/>`;
+        if (r % 2 === 0) out += `<polyline points="${fmt(C)}" fill="none" stroke="#0a1f5c" stroke-width="${(0.8 + 2.2 * t).toFixed(2)}" stroke-linecap="round"/>`;
+      }
+    });
     return `
-      <svg class="hero-art" viewBox="0 0 900 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-        <g class="topo">${contours(900, 900, 26, 'currentColor')}</g>
-        <path d="${road}" class="road-casing"/>
-        <path d="${road}" class="road-line" pathLength="1000"/>
-        <path d="${road}" class="road-ticks" pathLength="1000"/>
-        <g class="road-pins">
-          <circle cx="320" cy="335" r="7"/><circle cx="590" cy="235" r="7"/>
-        </g>
+      <svg class="hero-art" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <defs>
+          <linearGradient id="heroFade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#0a1f5c" stop-opacity="0"/>
+            <stop offset=".55" stop-color="#0a1f5c" stop-opacity="0"/>
+            <stop offset=".86" stop-color="#0a1f5c" stop-opacity=".92"/>
+            <stop offset="1" stop-color="#0a1f5c"/>
+          </linearGradient>
+        </defs>
+        <g class="terrain">${out}</g>
+        <rect width="${W}" height="${H}" fill="url(#heroFade)"/>
       </svg>`;
+  }
+  function mixHex(a, b, t) {
+    const pa = a.match(/\w\w/g).map((x) => parseInt(x, 16)), pb = b.match(/\w\w/g).map((x) => parseInt(x, 16));
+    return '#' + pa.map((v, k) => Math.round(v + (pb[k] - v) * t).toString(16).padStart(2, '0')).join('');
   }
 
   function renderLogin() {
@@ -126,15 +169,12 @@
       <div class="auth">
         <section class="auth-hero">
           ${loginHero()}
-          <div class="auth-hero-top">
-            <span class="portal-chip"><i></i>Портал заказчика</span>
-          </div>
+          <div class="auth-top"><img class="auth-logo" src="assets/logo-kcs-light.png" alt="Kazcomservice"></div>
           <div class="auth-hero-copy">
             <h1>Ваш объект под контролем на&nbsp;каждом пикете</h1>
             <p>Карта трассы, объёмы по слоям, подрядчики, геодезия и лаборатория. Данные вносят на объекте, WestSurvey проверяет и показывает их вам.</p>
           </div>
           <div class="object-card">
-            <img src="assets/logo-kcs.png" alt="Kazcomservice">
             <div>
               <span>Объект заказчика</span>
               <b>${esc(D.project.name)}</b>
@@ -144,13 +184,14 @@
         </section>
 
         <section class="auth-panel">
+          <div class="auth-top"><div class="auth-brand"><img class="auth-logo" src="assets/logo-ws.png" alt=""><b>WESTSURVEY</b></div></div>
           <div class="auth-box" id="authBox"></div>
           <footer class="auth-foot">WestSurvey, геодезическое сопровождение строительства</footer>
         </section>
       </div>`;
 
     const box = $('#authBox');
-    const brand = `<div class="auth-brand"><img src="assets/logo-ws.png" alt=""><b>WESTSURVEY</b></div>`;
+    const brand = '';
 
     const signIn = (role, name) => {
       const r = ROLES.find((x) => x.id === role) || ROLES[0];
