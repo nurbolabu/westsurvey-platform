@@ -12,15 +12,15 @@
 
   // Конструкция: снизу вверх (как на эскизе)
   const LAYERS = [
-    { id: 'base', name: 'Выемка / засыпка основания', short: 'Основание', unit: 'м³', design: 650.4, h: 64, color: '#8a6a4a', pattern: 'hatch', group: 'earth' },
-    { id: 's1', name: 'Насыпь, слой I (грунт)', short: 'Слой I', unit: 'м³', design: 940, h: 70, color: '#a5784a', pattern: 'hatch2', group: 'earth' },
-    { id: 's2', name: 'Насыпь, слой II (грунт)', short: 'Слой II', unit: 'м³', design: 446.5, h: 56, color: '#b98a52', pattern: 'wave', group: 'earth' },
-    { id: 's3', name: 'Насыпь, слой III (грунт)', short: 'Слой III', unit: 'м³', design: 650, h: 54, color: '#c99c5f', pattern: 'wave', group: 'earth' },
-    { id: 's4', name: 'Насыпь, слой IV (грунт)', short: 'Слой IV', unit: 'м³', design: 410, h: 44, color: '#d4ad72', pattern: 'wave', group: 'earth' },
-    { id: 's5', name: 'Насыпь, слой V (глинистый)', short: 'Слой V', unit: 'м³', design: 380, h: 42, color: '#c4a27e', pattern: 'wave2', group: 'earth' },
-    { id: 'gravel', name: 'Щебень Р600 (КЗ, МЗ)', short: 'Щебень', unit: 'м³', design: 120, h: 50, color: '#7d8796', pattern: 'dots', group: 'pave' },
-    { id: 'bitumen', name: 'Розлив битума', short: 'Битум', unit: 'т', design: 9, h: 40, color: '#2b2f36', pattern: 'solid', group: 'pave' },
-    { id: 'recycler', name: 'Recycler (ресайклинг)', short: 'Recycler', unit: 'м²', design: 140, h: 42, color: '#445066', pattern: 'diag', group: 'pave' },
+    { id: 'base', planStart: '2026-08-17', name: 'Выемка / засыпка основания', short: 'Основание', unit: 'м³', design: 650.4, h: 64, color: '#8a6a4a', pattern: 'hatch', group: 'earth' },
+    { id: 's1', planStart: '2026-09-21', name: 'Насыпь, слой I (грунт)', short: 'Слой I', unit: 'м³', design: 940, h: 70, color: '#a5784a', pattern: 'hatch2', group: 'earth' },
+    { id: 's2', planStart: '2027-04-12', name: 'Насыпь, слой II (грунт)', short: 'Слой II', unit: 'м³', design: 446.5, h: 56, color: '#b98a52', pattern: 'wave', group: 'earth' },
+    { id: 's3', planStart: '2027-05-03', name: 'Насыпь, слой III (грунт)', short: 'Слой III', unit: 'м³', design: 650, h: 54, color: '#c99c5f', pattern: 'wave', group: 'earth' },
+    { id: 's4', planStart: '2027-05-24', name: 'Насыпь, слой IV (грунт)', short: 'Слой IV', unit: 'м³', design: 410, h: 44, color: '#d4ad72', pattern: 'wave', group: 'earth' },
+    { id: 's5', planStart: '2027-06-14', name: 'Насыпь, слой V (глинистый)', short: 'Слой V', unit: 'м³', design: 380, h: 42, color: '#c4a27e', pattern: 'wave2', group: 'earth' },
+    { id: 'gravel', planStart: '2027-07-05', name: 'Щебень Р600 (КЗ, МЗ)', short: 'Щебень', unit: 'м³', design: 120, h: 50, color: '#7d8796', pattern: 'dots', group: 'pave' },
+    { id: 'bitumen', planStart: '2027-08-09', name: 'Розлив битума', short: 'Битум', unit: 'т', design: 9, h: 40, color: '#2b2f36', pattern: 'solid', group: 'pave' },
+    { id: 'recycler', planStart: '2027-08-30', name: 'Recycler (ресайклинг)', short: 'Recycler', unit: 'м²', design: 140, h: 42, color: '#445066', pattern: 'diag', group: 'pave' },
   ];
 
   const STAGES = [
@@ -42,7 +42,7 @@
   const CONTRACTORS = [
     {
       id: 'akzh', name: 'ТОО «Актобе Жол Курылыс»', short: 'Актобе Жол', from: 0, to: 65, color: '#0B41C7',
-      start: '2026-04-06',
+      start: '2026-08-17',
       contract: { no: '№ 07/26-СМР', date: '2026-03-02', sum: '3 940 000 000 ₸', until: '2027-08-31', subject: 'Строительство земляного полотна и дорожной одежды, ПК 0 – ПК 65' },
       team: [
         { name: 'Ержан Сарсенов', role: 'Руководитель проекта', phone: '+7 701 000 11 22' },
@@ -52,7 +52,7 @@
     },
     {
       id: 'zak', name: 'ТОО «ЗАК ТРАНС»', short: 'ЗАК ТРАНС', from: 65, to: 120, color: '#3BA9F5',
-      start: '2026-05-12',
+      start: '2026-09-07',
       contract: { no: '№ 12/26-СМР', date: '2026-04-15', sum: '3 310 000 000 ₸', until: '2027-09-30', subject: 'Строительство земляного полотна и дорожной одежды, ПК 65 – ПК 120' },
       team: [
         { name: 'Нурлан Абдрахманов', role: 'Руководитель проекта', phone: '+7 701 000 77 88' },
@@ -62,7 +62,7 @@
     },
     {
       id: 'btk', name: 'ТОО «Батыс Транс Құрылыс»', short: 'Батыс Транс', from: 120, to: 200, color: '#FF8562',
-      start: '2026-07-01',
+      start: '2026-10-05',
       contract: { no: '№ 19/26-СМР', date: '2026-06-10', sum: '4 760 000 000 ₸', until: '2027-11-30', subject: 'Строительство земляного полотна и дорожной одежды, ПК 120 – ПК 200' },
       team: [
         { name: 'Бауыржан Утепов', role: 'Руководитель проекта', phone: '+7 701 000 14 15' },
@@ -78,7 +78,8 @@
   ];
 
   // Профиль готовности вдоль трассы: [ПК, готовность]
-  const PROFILE = [[0, 1.1], [40, 1.05], [55, 0.86], [65, 0.72], [80, 0.66], [100, 0.71], [110, 0.5], [120, 0.42], [140, 0.36], [160, 0.16], [175, 0.04], [185, -0.1], [200, -0.2]];
+  // Начало строительства: в среднем ~10%, идут только основание и слой I насыпи
+  const PROFILE = [[0, 0.21], [30, 0.19], [64, 0.13], [65, 0.17], [100, 0.12], [119, 0.07], [120, 0.08], [140, 0.05], [155, 0.02], [165, -0.03], [200, -0.08]];
   const profileAt = (i) => {
     for (let k = 0; k < PROFILE.length - 1; k++) {
       const [a, va] = PROFILE[k], [b, vb] = PROFILE[k + 1];
@@ -92,11 +93,11 @@
   const pickets = [];
   let noise = 0;
   for (let i = 0; i < N; i++) {
-    noise = noise * 0.7 + (rnd() - 0.5) * 0.12;
+    noise = noise * 0.7 + (rnd() - 0.5) * 0.05;
     const c = CONTRACTORS.find((x) => i >= x.from && i < x.to);
     let p = clamp(profileAt(i) + noise, 0, 1);
     if (p > 0.97) p = 1;
-    if (p < 0.02) p = 0;
+    if (p < 0.012) p = 0;
 
     const x = p * LAYERS.length;
     const layers = LAYERS.map((L, k) => {
@@ -122,11 +123,11 @@
     const nextSurvey = started ? addDays(lastSurvey, 14) : addDays(new Date(c.start), Math.round((i - c.from) * 0.9) + 7);
 
     const inWork = p > 0 && p < 1;
-    const delayed = inWork && noise < -0.035;
+    const delayed = inWork && noise < -0.016;
     const status = p === 1 ? 'done' : delayed ? 'late' : inWork ? 'work' : 'none';
 
     // техника и люди сегодня стоят только на активных фронтах работ
-    const active = inWork && (i === 100 || rnd() < 0.16);
+    const active = inWork && (i === 100 || rnd() < 0.12);
     const nMach = active ? 2 + Math.floor(rnd() * 5) : 0;
     const machinery = [];
     const pool = [...MACHINES];
@@ -182,6 +183,7 @@
 
     pickets.push({
       i, pk, label: `ПК ${i} – ${i + 1}`, km: (i + 1) / 10, contractor: c, progress: p, status, delayed,
+      plan: Math.min(1, p + (delayed ? 0.045 : started ? 0.008 : 0)),
       layers, stages, current, startDate, started, lastSurvey, nextSurvey, machinery, workers,
       events, docsGeo, docsLab, photos, doneVolume, designVolume,
       note: delayed ? 'Отставание от графика на 6 дней. Подрядчику направлено предписание.' : p === 1 ? 'Работы на пикете завершены, замечаний нет.' : '',

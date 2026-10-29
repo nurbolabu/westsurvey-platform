@@ -9,6 +9,7 @@
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const num = (v, d = 1) => Number(v).toLocaleString('ru-RU', { maximumFractionDigits: d });
   const pct = (v) => Math.round(v * 100) + '%';
+  const pctD = (v) => (v * 100).toFixed(1).replace('.', ',') + '%';
   const date = (d) => (d ? d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—');
   const dateShort = (d) => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
   const daysBetween = (a, b) => Math.round((b - a) / 86400000);
@@ -160,6 +161,7 @@
         <aside class="sidebar" id="sidebar">
           <div class="brand"><img src="assets/logo.png" alt="">WESTSURVEY</div>
           <div>
+            <div class="nav-label">Объект</div>
             <nav class="nav">
               <button data-view="overview" ${state.view === 'overview' ? 'aria-current="page"' : ''}>${I.map}Схема трассы</button>
               <button data-view="pickets" ${state.view === 'pickets' ? 'aria-current="page"' : ''}>${I.list}Пикеты</button>
@@ -212,28 +214,36 @@
 
   // ---------- сводка ----------
   function totals(list = D.pickets) {
-    const t = { done: 0, work: 0, late: 0, none: 0, prog: 0, mach: 0, workers: 0, vol: 0, volDesign: 0 };
+    const t = { done: 0, work: 0, late: 0, none: 0, prog: 0, plan: 0, mach: 0, workers: 0, vol: 0, volDesign: 0 };
     list.forEach((p) => {
       t[p.status]++;
       t.prog += p.progress;
+      t.plan += p.plan;
       t.mach += p.machinery.length;
       t.workers += p.workers;
       t.vol += p.doneVolume;
       t.volDesign += p.designVolume;
     });
     t.prog /= list.length || 1;
+    t.plan /= list.length || 1;
     return t;
   }
 
   function renderOverview(main) {
     const t = totals();
+    const lag = t.plan - t.prog;
     main.innerHTML = `
-      ${topbar('Схема трассы', `${esc(D.project.region)} · обновлено ${date(D.TODAY)}`)}
+      ${topbar('Схема трассы', `${esc(D.project.region)}, данные на ${date(D.TODAY)}`)}
       <div class="kpis">
-        <div class="kpi accent"><span>Общая готовность</span><b class="num">${pct(t.prog)}</b><div class="bar"><i style="width:${pct(t.prog)}"></i></div></div>
-        <div class="kpi"><span>Завершено</span><b class="num">${t.done}</b><small>из ${D.N} пикетов</small></div>
-        <div class="kpi"><span>В работе</span><b class="num">${t.work + t.late}</b><small>${t.late} с отставанием</small></div>
-        <div class="kpi"><span>Объём земляных работ</span><b class="num">${num(t.vol / 1000, 0)}<small> тыс. м³</small></b><small>из ${num(t.volDesign / 1000, 0)} тыс. м³ по проекту</small></div>
+        <div class="kpi accent">
+          <span>Общая готовность</span>
+          <b class="num">${pctD(t.prog)}</b>
+          <div class="bar plan"><i style="width:${pct(t.prog)}"></i><em style="left:${pct(t.plan)}"></em></div>
+          <small>План на сегодня ${pctD(t.plan)}${lag > 0.002 ? `, отставание ${pctD(lag)}` : ''}</small>
+        </div>
+        <div class="kpi"><span>Пикетов в работе</span><b class="num">${t.work + t.late}</b><small>из ${D.N}, ещё не начато ${t.none}</small></div>
+        <div class="kpi ${t.late ? 'warn' : ''}"><span>С отставанием</span><b class="num">${t.late}</b><small>${plural(t.late, 'пикет', 'пикета', 'пикетов')} отстают от графика</small></div>
+        <div class="kpi"><span>Земляные работы</span><b class="num">${num(t.vol / 1000, 1)}<small> тыс. м³</small></b><small>из ${num(t.volDesign / 1000, 0)} тыс. м³ по проекту</small></div>
         <div class="kpi"><span>Техника на объекте</span><b class="num">${t.mach}</b><small>единиц сегодня</small></div>
         <div class="kpi"><span>Рабочие</span><b class="num">${t.workers}</b><small>человек на смене</small></div>
       </div>
@@ -248,10 +258,14 @@
         </section>
         <section class="card">
           <div class="card-head">
-            <h2>Линейный график: готовность слоёв по пикетам</h2>
+            <div>
+              <h2>Линейный график работ</h2>
+              <p class="card-sub">Слои в порядке выполнения. Нажмите на участок, чтобы открыть пикет.</p>
+            </div>
             <div class="spacer"></div>
-            <div class="scale-legend">0% <i></i> 100%</div>
+            <div class="scale-legend"><span>Готовность слоя на пикете</span>0% <i></i> 100%</div>
           </div>
+          <div id="ribbonSummary"></div>
           <div class="ribbon-scroll" id="ribbon"></div>
         </section>
       </div>`;
@@ -382,44 +396,102 @@
   function hideTip() { tip.hidden = true; }
 
   // ---------- линейный график ----------
+  // На старте стройки большинство слоёв пустые, поэтому каждая строка несёт
+  // свою информацию: начатые показывают готовность по пикетам и объём,
+  // не начатые показывают плановую дату старта по графику.
   function drawRibbon() {
     const el = $('#ribbon');
     if (!el) return;
-    const rows = [...D.LAYERS].reverse();
-    const rh = 22, W = 1000, cw = W / D.N;
-    let cells = '';
-    rows.forEach((L, r) => {
-      D.pickets.forEach((p) => {
-        const f = p.layers.find((x) => x.id === L.id).frac;
-        const on = matches(p);
-        const fill = f <= 0 ? '#e9ecf3' : mix('#bcd0f7', '#0B41C7', f);
-        cells += `<rect class="cell" x="${p.i * cw}" y="${r * rh + 1}" width="${cw + 0.2}" height="${rh - 2}" fill="${fill}" opacity="${on ? 1 : 0.2}"/>`;
-      });
+    const list = D.pickets.filter(matches);
+    const N = D.N;
+    const longDate = (s) => new Date(s).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }).replace(' г.', '');
+
+    const layerStats = D.LAYERS.map((L, k) => {
+      const done = list.reduce((s, p) => s + p.layers[k].done, 0);
+      const design = list.reduce((s, p) => s + p.layers[k].design, 0);
+      const started = list.filter((p) => p.layers[k].frac > 0).length;
+      return { L, k, done, design, frac: design ? done / design : 0, started };
     });
-    const late = D.pickets.filter((p) => p.status === 'late').map((p) => `<rect x="${p.i * cw}" y="${rows.length * rh + 2}" width="${cw}" height="5" fill="#F95D51" opacity="${matches(p) ? 1 : .2}"/>`).join('');
-    let axis = '';
-    for (let i = 0; i <= D.N; i += 10) {
-      axis += `<line x1="${i * cw}" x2="${i * cw}" y1="0" y2="${rows.length * rh}" stroke="#fff" stroke-width="${i % 50 ? 0.6 : 1.6}"/>`;
-    }
-    const hits = D.pickets.map((p) => `<rect class="col-hit" data-pk="${p.i}" x="${p.i * cw}" y="0" width="${cw}" height="${rows.length * rh + 8}"/>`).join('');
-    const H = rows.length * rh + 10;
-    const labels = [];
-    for (let i = 0; i <= D.N; i += 20) labels.push(`<span style="position:absolute;left:${(i / D.N) * 100}%;transform:translateX(${i === 0 ? '0' : i === D.N ? '-100%' : '-50%'})">ПК ${i}</span>`);
+    const active = layerStats.filter((s) => s.started > 0 && s.frac < 1);
+    const next = layerStats.find((s) => s.started === 0);
+    const fronts = list.filter((p) => p.machinery.length);
+
+    $('#ribbonSummary').innerHTML = `
+      <div class="rb-summary">
+        <div><span>Сейчас в работе</span><b>${active.length ? active.map((s) => s.L.short).join(', ') : 'нет'}</b></div>
+        <div><span>Следующий слой по графику</span><b>${next ? `${next.L.short}, с ${longDate(next.L.planStart)}` : 'все слои начаты'}</b></div>
+        <div><span>Активные фронты сегодня</span><b>${fronts.length} ${plural(fronts.length, 'пикет', 'пикета', 'пикетов')}</b></div>
+      </div>`;
+
+    const cellsSVG = (k) => {
+      const cw = 1000 / N;
+      return D.pickets.map((p) => {
+        const f = p.layers[k].frac;
+        if (f <= 0) return '';
+        const on = matches(p);
+        return `<rect x="${p.i * cw}" y="0" width="${cw + 0.3}" height="100" fill="${mix('#9DB7F2', '#0B41C7', f)}" opacity="${on ? 1 : 0.18}"/>`;
+      }).join('');
+    };
+
+    const contractorBand = D.CONTRACTORS.map((c) => `
+      <div class="rb-contr ${state.contractor === 'all' || state.contractor === c.id ? '' : 'off'}" style="left:${(c.from / N) * 100}%;width:${((c.to - c.from) / N) * 100}%">
+        <i style="background:${c.color}"></i><span>${esc(c.short)}</span>
+      </div>`).join('');
+
+    const frontMarks = D.pickets.filter((p) => p.machinery.length).map((p) =>
+      `<i class="rb-front ${matches(p) ? '' : 'off'}" style="left:${((p.i + 0.5) / N) * 100}%" title="${p.label}"></i>`).join('');
+
+    const rows = layerStats.map((s) => {
+      const empty = s.started === 0;
+      return `
+        <div class="rb-row ${empty ? 'rb-empty' : ''}">
+          <div class="rb-label"><b>${esc(s.L.short)}</b><span class="num">${empty ? 'не начат' : s.frac < 0.01 ? '<1%' : pct(s.frac)}</span></div>
+          <div class="rb-track" data-track>
+            ${empty
+              ? `<span class="rb-plan">Начало по графику ${longDate(s.L.planStart)}</span>`
+              : `<svg viewBox="0 0 1000 100" preserveAspectRatio="none">${cellsSVG(s.k)}</svg>`}
+          </div>
+          <div class="rb-val num">${empty ? '—' : `${num(s.done / 1000, 1)} из ${num(s.design / 1000, 1)} тыс. ${s.L.unit}`}</div>
+        </div>`;
+    }).join('');
+
+    const late = D.pickets.filter((p) => p.status === 'late').map((p) =>
+      `<i class="rb-late ${matches(p) ? '' : 'off'}" style="left:${(p.i / N) * 100}%;width:${100 / N}%"></i>`).join('');
+
+    const ticks = [];
+    for (let i = 0; i <= N; i += 20) ticks.push(`<span style="left:${(i / N) * 100}%">ПК ${i}</span>`);
+
     el.innerHTML = `
       <div class="ribbon">
-        <div class="labels">${rows.map((L) => `<div>${esc(L.short)}</div>`).join('')}<div style="height:10px;color:var(--red);font-size:11px">отставание</div></div>
-        <div>
-          <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:${H}px">${cells}${axis}${late}${hits}</svg>
-          <div style="position:relative;height:20px;font-size:11.5px;color:var(--muted);font-weight:600;margin-top:4px">${labels.join('')}</div>
+        <div class="rb-row rb-meta">
+          <div class="rb-label"><span>Подрядчики</span></div>
+          <div class="rb-track bare" data-track>${contractorBand}</div><div class="rb-val"></div>
+        </div>
+        <div class="rb-row rb-meta">
+          <div class="rb-label"><span>Фронты работ</span></div>
+          <div class="rb-track bare fronts" data-track>${frontMarks}</div><div class="rb-val"></div>
+        </div>
+        ${rows}
+        <div class="rb-row rb-meta">
+          <div class="rb-label"><span class="late-txt">Отставание</span></div>
+          <div class="rb-track bare lates" data-track>${late}</div><div class="rb-val"></div>
+        </div>
+        <div class="rb-row rb-axis">
+          <div class="rb-label"></div><div class="rb-ticks">${ticks.join('')}</div><div class="rb-val"></div>
         </div>
       </div>`;
-    $$('.col-hit', el).forEach((r) => {
-      const p = D.pickets[+r.dataset.pk];
-      r.addEventListener('mousemove', (e) => showTip(e, p));
-      r.addEventListener('mouseleave', hideTip);
-      r.addEventListener('click', () => { hideTip(); go(state.view, p.i); });
+
+    $$('[data-track]', el).forEach((tr) => {
+      const at = (e) => {
+        const r = tr.getBoundingClientRect();
+        return D.pickets[Math.max(0, Math.min(N - 1, Math.floor(((e.clientX - r.left) / r.width) * N)))];
+      };
+      tr.addEventListener('mousemove', (e) => showTip(e, at(e)));
+      tr.addEventListener('mouseleave', hideTip);
+      tr.addEventListener('click', (e) => { hideTip(); go(state.view, at(e).i); });
     });
   }
+
   function mix(a, b, t) {
     const pa = a.match(/\w\w/g).map((h) => parseInt(h, 16));
     const pb = b.match(/\w\w/g).map((h) => parseInt(h, 16));
@@ -480,7 +552,7 @@
               <div><b class="num">${t.workers}</b><span>рабочих</span></div>
             </div>
             <div class="chips" style="margin-bottom:14px">
-              <span class="pill done">${t.done} завершено</span>
+              ${t.done ? `<span class="pill done">${t.done} завершено</span>` : ''}
               <span class="pill work">${t.work} в работе</span>
               ${t.late ? `<span class="pill late">${t.late} отставание</span>` : ''}
             </div>
@@ -633,7 +705,7 @@
           <div class="xs-labels">
             ${top.map((L) => `
               <button class="xs-label ${state.layer === L.id ? 'sel' : ''}" data-layer="${L.id}" style="height:${L.h}px">
-                <span class="t"><b>${esc(L.short === 'Основание' ? 'Основание' : L.name.replace('Насыпь, слой', 'Слой'))}</b><span class="num">${num(L.done)} из ${num(L.design)} ${L.unit}</span></span>
+                <span class="t"><b>${esc(L.short === 'Основание' ? 'Основание' : L.name.replace('Насыпь, слой', 'Слой'))}</b><span class="num">${L.frac > 0 ? `${num(L.done)} из ${num(L.design)} ${L.unit}` : `по графику с ${date(new Date(L.planStart))}`}</span></span>
                 <span class="p num ${L.frac >= 1 ? 'full' : L.frac <= 0 ? 'zero' : 'part'}">${pct(L.frac)}</span>
               </button>`).join('')}
             <div class="xs-ground" style="height:${groundH}px">Естественный грунт</div>
@@ -653,6 +725,7 @@
       <h4>${esc(L.name)}</h4>
       <dl class="kv">
         <dt>Статус</dt><dd>${statusTxt}</dd>
+        ${L.frac <= 0 ? `<dt>Начало по графику</dt><dd>${date(new Date(L.planStart))}</dd>` : ''}
         <dt>Проектный объём</dt><dd class="num">${num(L.design)} ${L.unit}</dd>
         <dt>Выполнено</dt><dd class="num">${num(L.done)} ${L.unit} · ${pct(L.frac)}</dd>
         <dt>Остаток</dt><dd class="num">${num(L.design - L.done)} ${L.unit}</dd>
@@ -677,21 +750,19 @@
     const cur = p.current === -1 ? null : p.stages[p.current];
     const doneStages = p.stages.filter((s) => s.done).length;
     const nowTitle = !p.started ? 'Работы не начаты' : cur ? cur.name : 'Работы завершены';
-    const nowNote = !p.started
-      ? `Плановое начало ${date(p.startDate)}`
-      : cur ? `Этап ${p.current + 1} из ${p.stages.length}` : 'Все этапы приняты';
+    const nowNote = !p.started ? `Плановое начало ${date(p.startDate)}` : cur ? `Этап ${p.current + 1} из ${p.stages.length}` : 'Все этапы приняты';
     const nowCls = !p.started ? 'none' : !cur ? 'done' : p.delayed ? 'late' : 'work';
 
     return `
-      <section class="sheet">
-        <div class="sheet-title">
+      <section class="card hero-card">
+        <div class="hero-top">
           <div>
             <h1 class="chain">ПК ${p.i}<span>+00</span> — ПК ${p.i + 1}<span>+00</span></h1>
-            <p>${num(p.i / 10)}–${num(p.km)} км трассы, участок ${esc(c.name)}</p>
+            <p class="muted">${num(p.i / 10)}–${num(p.km)} км трассы</p>
           </div>
-          <dl class="smr"><dt>${p.started ? 'Начало СМР' : 'Начало СМР по плану'}</dt><dd class="num">${date(p.startDate)}</dd></dl>
+          <div class="spacer"></div>
+          <div class="date-box"><span>${p.started ? 'Дата начала СМР' : 'Начало СМР по плану'}</span><b class="num">${date(p.startDate)}</b></div>
         </div>
-
         <div class="now ${nowCls}">
           <div class="now-main">
             <span class="now-label">Текущий статус</span>
@@ -704,80 +775,59 @@
             ${p.delayed ? '<span class="pill late">Отставание от графика</span>' : ''}
           </div>
         </div>
+      </section>
 
-        <div class="sheet-row contractor-row">
-          <div>
+      <section class="card">
+        <div class="contractor-block">
+          <div style="flex:1;min-width:220px">
             <span class="cell-label">Подрядная организация</span>
             <h3>${esc(c.name)}</h3>
-            <p>Задействован на ПК ${c.from} – ПК ${c.to}, ${num((c.to - c.from) / 10)} км</p>
+            <p>Задействован на ПК ${c.from} – ПК ${c.to} (${num((c.to - c.from) / 10)} км)</p>
           </div>
           <button class="btn" data-contract>${I.doc}Посмотреть договор</button>
         </div>
-        <div class="sheet-row people">${c.team.map(personHTML).join('')}${D.SUPERVISION.map(personHTML).join('')}</div>
-
-        <div class="cells c4">
-          <div class="cell">
-            <span class="cell-label">Техника на пикете</span>
-            <b class="num">${p.machinery.length}</b>
-            ${p.machinery.length ? `<div class="chips">${p.machinery.map((x) => `<span class="chip">${esc(x)}</span>`).join('')}</div>` : `<small>${p.progress >= 1 ? 'Работы завершены' : 'Техника не выставлена'}</small>`}
-          </div>
-          <div class="cell">
-            <span class="cell-label">Рабочая сила</span>
-            <b class="num">${p.workers}</b>
-            <small>${p.workers ? plural(p.workers, 'человек', 'человека', 'человек') + ' на смене' : 'Нет людей на смене'}</small>
-          </div>
-          <div class="cell">
-            <span class="cell-label">Последняя геодезическая съёмка</span>
-            <b class="num">${date(p.lastSurvey)}</b>
-            <small>${p.lastSurvey ? daysBetween(p.lastSurvey, D.TODAY) + ' дн. назад' : 'Съёмок ещё не было'}</small>
-          </div>
-          <div class="cell ${daysToNext < 0 ? 'warn' : ''}">
-            <span class="cell-label">Следующая геодезическая съёмка</span>
-            <b class="num">${date(p.nextSurvey)}</b>
-            <small>${nextTxt}</small>
-          </div>
-        </div>
-
-        <div class="cells c2">
-          <div class="cell">
-            <span class="cell-label">Объём выполненных работ, грунт и щебень</span>
-            <b class="num">${num(p.doneVolume, 1)} м³</b>
-            <small>из ${num(p.designVolume, 1)} м³ по проекту</small>
-            <div class="bar"><i style="width:${pct(p.doneVolume / p.designVolume)}"></i></div>
-          </div>
-          <div class="cell">
-            <span class="cell-label">Покрытие</span>
-            ${['bitumen', 'recycler'].map((id) => {
-              const L = p.layers.find((x) => x.id === id);
-              return `<div class="cover-row"><span>${L.short}</span><b class="num">${num(L.done)} из ${num(L.design)} ${L.unit}</b></div><div class="bar"><i style="width:${pct(L.frac)}"></i></div>`;
-            }).join('')}
-          </div>
-        </div>
+        <div class="people">${c.team.map(personHTML).join('')}${D.SUPERVISION.map(personHTML).join('')}</div>
       </section>
 
-      <section class="sheet cells c3">
-        <div class="cell docs">
-          <h3>Геодезия</h3>
+      <div class="facts">
+        <div class="fact">
+          <span>Техника на пикете</span><b class="num">${p.machinery.length} ${plural(p.machinery.length, 'единица', 'единицы', 'единиц')}</b>
+          ${p.machinery.length ? `<div class="chips">${p.machinery.map((x) => `<span class="chip">${esc(x)}</span>`).join('')}</div>` : `<small>${p.started ? 'Сегодня техника не выставлена' : 'Работы не начаты'}</small>`}
+        </div>
+        <div class="fact"><span>Рабочая сила</span><b class="num">${p.workers} ${plural(p.workers, 'человек', 'человека', 'человек')}</b><small>${p.workers ? 'на текущей смене' : 'нет людей на смене'}</small></div>
+        <div class="fact"><span>Последняя геодезическая съёмка</span><b class="num">${date(p.lastSurvey)}</b><small>${p.lastSurvey ? daysBetween(p.lastSurvey, D.TODAY) + ' дн. назад' : 'съёмок ещё не было'}</small></div>
+        <div class="fact ${daysToNext < 0 ? 'warn' : ''}"><span>Следующая геодезическая съёмка</span><b class="num">${date(p.nextSurvey)}</b><small>${nextTxt}</small></div>
+      </div>
+
+      <div class="facts two">
+        <div class="fact"><span>Объём выполненных работ, грунт и щебень</span><b class="num">${num(p.doneVolume, 1)} м³</b><small>из ${num(p.designVolume, 1)} м³ по проекту</small><div class="bar"><i style="width:${pct(p.doneVolume / p.designVolume)}"></i></div></div>
+        <div class="fact"><span>Покрытие</span>${['bitumen', 'recycler'].map((id) => {
+          const L = p.layers.find((x) => x.id === id);
+          return `<div class="cover-row"><span>${L.short}</span><b class="num">${num(L.done)} из ${num(L.design)} ${L.unit}</b></div><div class="bar"><i style="width:${pct(L.frac)}"></i></div>`;
+        }).join('')}</div>
+      </div>
+
+      <div class="cards-3">
+        <section class="card">
+          <div class="card-head"><h3>Геодезия</h3></div>
           ${docsHTML(p.docsGeo, 'geo')}
-        </div>
-        <div class="cell docs">
-          <h3>Лаборатория</h3>
+        </section>
+        <section class="card">
+          <div class="card-head"><h3>Лаборатория</h3></div>
           ${docsHTML(p.docsLab, 'lab')}
-        </div>
-        <div class="cell docs">
-          <h3>Примечание и фото</h3>
-          ${p.note ? `<p class="note ${p.delayed ? '' : 'ok'}">${esc(p.note)}</p>` : ''}
+        </section>
+        <section class="card">
+          <div class="card-head"><h3>Примечание (фото)</h3></div>
+          ${p.note ? `<div class="note ${p.delayed ? '' : 'ok'}">${esc(p.note)}</div>` : ''}
           ${p.photos.length ? `<div class="photos">${p.photos.map((ph, k) => `<button class="photo" data-photo="${k}" aria-label="${esc(ph.caption)}">${photoSVG(ph, p)}<span>${dateShort(ph.date)}</span></button>`).join('')}</div>` : '<p class="empty">Фото появятся после первого выезда на пикет.</p>'}
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <section class="sheet">
-        <div class="sheet-row log-head"><h3>Журнал работ</h3><span class="muted">${p.events.length} ${plural(p.events.length, 'запись', 'записи', 'записей')}</span></div>
-        <div class="sheet-row">
+      <section class="card">
+        <div class="card-head"><h3>Журнал работ</h3><div class="spacer"></div><span class="muted" style="font-size:12.5px">${p.events.length} ${plural(p.events.length, 'запись', 'записи', 'записей')}</span></div>
         ${p.events.length ? `<ol class="timeline">${p.events.map((e) => `
           <li><span class="d num">${date(e.date)}</span><span class="ico ${e.type}">${{ geo: I.pin, work: I.check, progress: I.pin, lab: I.flask, warn: I.alert }[e.type]}</span>
           <div class="t">${esc(e.text)}<span>${esc(e.who)}</span></div></li>`).join('')}</ol>` : `<p class="empty">Записей пока нет. Работы на пикете начнутся ${date(p.startDate)}.</p>`}
-        </div>
       </section>`;
   }
 
