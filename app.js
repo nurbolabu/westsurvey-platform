@@ -50,6 +50,7 @@
     down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>',
     upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
     chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+    eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
     menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>',
     phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg>',
   };
@@ -103,57 +104,157 @@
     return out;
   }
 
+  // Доступ только по приглашению WestSurvey: открытой регистрации нет.
+  // Вход по почте и паролю или по одноразовому коду из SMS; новый участник отправляет запрос доступа.
+  function loginHero() {
+    const road = 'M -40 470 C 110 455, 190 370, 320 335 S 500 330, 590 235 S 720 105, 960 70';
+    return `
+      <svg class="hero-art" viewBox="0 0 900 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <g class="topo">${contours(900, 900, 26, 'currentColor')}</g>
+        <path d="${road}" class="road-casing"/>
+        <path d="${road}" class="road-line" pathLength="1000"/>
+        <path d="${road}" class="road-ticks" pathLength="1000"/>
+        <g class="road-pins">
+          <circle cx="320" cy="335" r="7"/><circle cx="590" cy="235" r="7"/>
+        </g>
+      </svg>`;
+  }
+
   function renderLogin() {
-    let role = 'customer';
+    let mode = 'password';
     root.innerHTML = `
-      <div class="login">
-        <section class="login-brand">
-          <svg class="contours" viewBox="0 0 800 900" preserveAspectRatio="none" aria-hidden="true">${contours(800, 900, 22, '#fff')}</svg>
-          ${logosHTML().replace('logos', 'logos on-blue')}
-          <div>
-            <h1>Контроль строительства автодороги</h1>
-            <p>Ход работ по каждому пикету: конструкция и объёмы, подрядчики, техника, геодезические съёмки и лабораторные испытания. ${esc(D.project.region)}.</p>
+      <div class="auth">
+        <section class="auth-hero">
+          ${loginHero()}
+          <div class="auth-hero-top">
+            <span class="portal-chip"><i></i>Портал заказчика</span>
           </div>
-          <div class="login-stats">
-            <div><b>${D.project.length} км</b><span>протяжённость трассы</span></div>
-            <div><b>${D.N}</b><span>пикетов под контролем</span></div>
-            <div><b>${D.CONTRACTORS.length}</b><span>подрядные организации</span></div>
+          <div class="auth-hero-copy">
+            <h1>Ваш объект под контролем на&nbsp;каждом пикете</h1>
+            <p>Карта трассы, объёмы по слоям, подрядчики, геодезия и лаборатория. Данные вносят на объекте, WestSurvey проверяет и показывает их вам.</p>
+          </div>
+          <div class="object-card">
+            <img src="assets/logo-kcs.png" alt="Kazcomservice">
+            <div>
+              <span>Объект заказчика</span>
+              <b>${esc(D.project.name)}</b>
+              <small>${esc(D.project.region)}</small>
+            </div>
           </div>
         </section>
-        <section class="login-form-wrap">
-          <form class="login-form" novalidate>
-            <h2>Вход в платформу</h2>
-            <p class="sub">Используйте учётную запись, выданную администратором проекта.</p>
-            <label class="field"><span>Электронная почта</span><input name="email" type="email" autocomplete="username" placeholder="name@company.kz" value="demo@westsurvey.kz"></label>
-            <label class="field"><span>Пароль</span><input name="password" type="password" autocomplete="current-password" placeholder="••••••••" value="demo-access"></label>
-            <span class="field"><span>Роль</span></span>
-            <div class="roles" role="group" aria-label="Роль">
-              ${ROLES.map((r) => `<button type="button" class="role" data-role="${r.id}" aria-pressed="${r.id === role}">${r.name}<small>${r.desc}</small></button>`).join('')}
-            </div>
-            <div class="err" aria-live="polite"></div>
-            <button class="btn" type="submit">Войти</button>
-            <p class="proto-note">Прототип: вход проверяется только в браузере. В рабочей версии будет серверная авторизация и права по ролям.</p>
-          </form>
+
+        <section class="auth-panel">
+          <div class="auth-box" id="authBox"></div>
+          <footer class="auth-foot">WestSurvey, геодезическое сопровождение строительства</footer>
         </section>
       </div>`;
-    const form = $('.login-form');
-    $$('.role', form).forEach((b) => b.addEventListener('click', () => {
-      role = b.dataset.role;
-      $$('.role', form).forEach((x) => x.setAttribute('aria-pressed', x === b));
-    }));
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const email = form.email.value.trim();
-      const pass = form.password.value;
-      const err = $('.err', form);
-      if (!/^\S+@\S+\.\S+$/.test(email)) { err.textContent = 'Введите корректный адрес почты'; return; }
-      if (pass.length < 4) { err.textContent = 'Введите пароль'; return; }
-      const r = ROLES.find((x) => x.id === role);
-      const name = email.startsWith('demo@') ? 'Демо пользователь' : email.split('@')[0];
-      state.user = { email, name, role: r.id, roleName: r.name };
+
+    const box = $('#authBox');
+    const brand = `<div class="auth-brand"><img src="assets/logo-ws.png" alt=""><b>WESTSURVEY</b></div>`;
+
+    const signIn = (role, name) => {
+      const r = ROLES.find((x) => x.id === role) || ROLES[0];
+      state.user = { email: 'demo@westsurvey.kz', name: name || 'Демо пользователь', role: r.id, roleName: r.name };
       store.set('ws_user', state.user);
       render();
-    });
+    };
+
+    function showLogin() {
+      box.innerHTML = `
+        ${brand}
+        <h2>Вход в кабинет объекта</h2>
+        <p class="sub">Доступ выдаёт WestSurvey. Войдите с данными из приглашения.</p>
+        <div class="auth-switch" role="tablist" aria-label="Способ входа">
+          <button role="tab" data-mode="password" aria-selected="${mode === 'password'}">По паролю</button>
+          <button role="tab" data-mode="code" aria-selected="${mode === 'code'}">По коду из SMS</button>
+        </div>
+        <form class="login-form" novalidate>
+          ${mode === 'password' ? `
+            <label class="field"><span>Электронная почта</span><input name="login" type="email" autocomplete="username" placeholder="name@company.kz" value="demo@westsurvey.kz"></label>
+            <label class="field pass"><span>Пароль</span><input name="secret" type="password" autocomplete="current-password" placeholder="Пароль" value="demo-access"><button type="button" class="eye" aria-label="Показать пароль">${I.eye}</button></label>
+            <button type="button" class="link-btn" id="forgot">Забыли пароль?</button>`
+          : `
+            <label class="field"><span>Номер телефона</span><input name="login" type="tel" autocomplete="tel" placeholder="+7 7__ ___ __ __" value="+7 701 000 00 00"></label>
+            <div class="code-row">
+              <label class="field"><span>Код из SMS</span><input name="secret" inputmode="numeric" autocomplete="one-time-code" placeholder="4 цифры" maxlength="6"></label>
+              <button type="button" class="btn ghost" id="sendCode">Получить код</button>
+            </div>`}
+          <div class="err" aria-live="polite"></div>
+          <button class="btn" type="submit">Войти</button>
+        </form>
+        <div class="auth-alt">
+          <span>Нет доступа к объекту?</span>
+          <button type="button" class="link-btn" id="toRequest">Запросить доступ</button>
+        </div>
+        <div class="demo-row">
+          <span>Демо-доступ</span>
+          ${ROLES.map((r) => `<button type="button" class="demo-chip" data-demo="${r.id}">${r.name}</button>`).join('')}
+        </div>`;
+
+      $$('[data-mode]', box).forEach((b) => b.addEventListener('click', () => { mode = b.dataset.mode; showLogin(); }));
+      $$('[data-demo]', box).forEach((b) => b.addEventListener('click', () => signIn(b.dataset.demo)));
+      $('#toRequest').addEventListener('click', showRequest);
+      $('.eye', box)?.addEventListener('click', (e) => {
+        const inp = box.querySelector('input[name=secret]');
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+        e.currentTarget.setAttribute('aria-label', inp.type === 'password' ? 'Показать пароль' : 'Скрыть пароль');
+      });
+      $('#forgot')?.addEventListener('click', () => { mode = 'code'; showLogin(); toast('Войдите по коду из SMS, затем задайте новый пароль в профиле'); });
+      $('#sendCode')?.addEventListener('click', () => toast('Прототип: подойдёт любой код из 4 цифр'));
+
+      const form = $('.login-form', box);
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const err = $('.err', form);
+        const login = form.login.value.trim();
+        const secret = form.secret.value.trim();
+        if (mode === 'password' && !/^\S+@\S+\.\S+$/.test(login)) { err.textContent = 'Введите почту в формате name@company.kz'; return; }
+        if (mode === 'code' && login.replace(/\D/g, '').length < 11) { err.textContent = 'Введите номер телефона полностью'; return; }
+        if (mode === 'password' && secret.length < 4) { err.textContent = 'Введите пароль'; return; }
+        if (mode === 'code' && !/^\d{4,6}$/.test(secret)) { err.textContent = 'Введите код из SMS, 4–6 цифр'; return; }
+        signIn('customer', login.startsWith('demo@') || mode === 'code' ? 'Демо пользователь' : login.split('@')[0]);
+      });
+    }
+
+    function showRequest() {
+      box.innerHTML = `
+        ${brand}
+        <button type="button" class="link-btn back" id="toLogin">${I.back}Ко входу</button>
+        <h2>Запрос доступа к объекту</h2>
+        <p class="sub">WestSurvey проверит запрос и пришлёт приглашение на почту или по SMS. Обычно в течение рабочего дня.</p>
+        <form class="login-form" id="reqForm">
+          <label class="field"><span>Фамилия и имя</span><input name="name" autocomplete="name" required></label>
+          <label class="field"><span>Организация</span><input name="org" autocomplete="organization" placeholder="Например, Kazcomservice" required></label>
+          <label class="field"><span>Роль на объекте</span>
+            <select name="role">${ROLES.map((r) => `<option value="${r.id}">${r.name}: ${r.desc.toLowerCase()}</option>`).join('')}</select>
+          </label>
+          <label class="field"><span>Телефон или почта</span><input name="contact" autocomplete="email" required></label>
+          <div class="err" aria-live="polite"></div>
+          <button class="btn" type="submit">Отправить запрос</button>
+        </form>`;
+      $('#toLogin').addEventListener('click', showLogin);
+      $('#reqForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const f = e.target;
+        if (!f.name.value.trim() || !f.org.value.trim() || !f.contact.value.trim()) { $('.err', f).textContent = 'Заполните все поля'; return; }
+        try {
+          const list = JSON.parse(localStorage.getItem('ws_access_requests') || '[]');
+          list.unshift({ name: f.name.value.trim(), org: f.org.value.trim(), role: f.role.value, contact: f.contact.value.trim(), at: new Date().toISOString() });
+          localStorage.setItem('ws_access_requests', JSON.stringify(list));
+        } catch {}
+        box.innerHTML = `
+          ${brand}
+          <div class="sent">
+            <span class="sent-ico">${I.check}</span>
+            <h2>Запрос отправлен</h2>
+            <p class="sub">Администратор WestSurvey проверит его и пришлёт приглашение на ${esc(f.contact.value.trim())}. По ссылке из приглашения вы зададите пароль и сразу увидите свой объект.</p>
+            <button type="button" class="btn ghost" id="toLogin">Вернуться ко входу</button>
+          </div>`;
+        $('#toLogin').addEventListener('click', showLogin);
+      });
+    }
+
+    showLogin();
   }
 
   // ================= ПРИЛОЖЕНИЕ =================
@@ -165,17 +266,16 @@
     { view: 'overview', icon: 'map', name: 'Карта и ход работ' },
     { view: 'pickets', icon: 'list', name: 'Пикеты' },
     { view: 'contractors', icon: 'users', name: 'Подрядчики' },
-    { view: 'entry', icon: 'edit', name: 'Ввод данных' },
   ];
-  const DOCS_URL = 'https://github.com/nurbolabu/westsurvey-platform/blob/main/docs/ARCHITECTURE.md';
+  const navBtn = (n, pending) => `<button data-view="${n.view}" ${state.view === n.view ? 'aria-current="page"' : ''}>${I[n.icon]}<span>${n.name}</span>${pending ? `<em class="badge">${pending}</em>` : ''}</button>`;
   let mapCtl = null;
 
   function logosHTML() {
     return `
       <div class="logos">
-        <span class="logo-box ws"><img src="assets/logo.png" alt=""><b>WESTSURVEY</b></span>
+        <span class="logo-box ws"><img src="assets/logo-ws.png" alt=""><b>WESTSURVEY</b></span>
         <span class="logo-sep" aria-hidden="true"></span>
-        <span class="logo-box kcs"><img src="assets/kazcomservice.png" alt="Kazcomservice"></span>
+        <span class="logo-box kcs"><img src="assets/logo-kcs.png" alt="Kazcomservice"></span>
       </div>`;
   }
 
@@ -191,21 +291,17 @@
         <div class="appbar-project"><b>${esc(D.project.name)}</b><span>${esc(D.project.region)}, ПК 0 – ПК ${D.N}</span></div>
         <div class="spacer"></div>
         <form class="search" id="pkSearch" role="search">${I.search}<input inputmode="numeric" placeholder="Пикет, например 100" aria-label="Номер пикета"></form>
-        <div class="appbar-user">
-          <div class="avatar">${esc(initials(u.name).toUpperCase())}</div>
-          <div class="meta"><b>${esc(u.name)}</b><span>${esc(u.roleName)}</span></div>
-          <button class="icon-btn ghosty" id="logout" aria-label="Выйти" title="Выйти">${I.logout}</button>
-        </div>
       </header>
       <div class="app ${navOpen ? 'nav-open' : 'nav-closed'}" id="app">
         <aside class="sidebar" id="sidebar">
-          <nav class="nav">
-            ${NAV.map((n) => `<button data-view="${n.view}" ${state.view === n.view ? 'aria-current="page"' : ''}>${I[n.icon]}<span>${n.name}</span>${n.view === 'entry' && pending ? `<em class="badge">${pending}</em>` : ''}</button>`).join('')}
-          </nav>
-          <a class="side-link" href="${DOCS_URL}" target="_blank" rel="noopener">${I.doc}<span>Как устроена система</span></a>
-          <div class="side-project">
-            <b>${esc(D.project.name)}</b>
-            ${esc(D.project.region)}, ${D.project.length} км, ${D.CONTRACTORS.length} подрядчика
+          <nav class="nav" aria-label="Разделы">${NAV.map((n) => navBtn(n)).join('')}</nav>
+          <div class="side-bottom">
+            <nav class="nav" aria-label="Данные">${navBtn({ view: 'entry', icon: 'edit', name: 'Ввод данных' }, pending)}</nav>
+            <div class="account">
+              <div class="avatar">${esc(initials(u.name).toUpperCase())}</div>
+              <div class="meta"><b>${esc(u.name)}</b><span>${esc(u.roleName)}</span></div>
+              <button class="icon-btn ghosty" id="logout" aria-label="Выйти" title="Выйти">${I.logout}</button>
+            </div>
           </div>
         </aside>
         <div class="scrim" id="scrim"></div>
