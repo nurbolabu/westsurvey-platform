@@ -1014,3 +1014,4 @@ fieldset.field legend { font-size: 13px; font-weight: 600; margin-bottom: 8px; c
   .auth-logo { height: 32px; }
   .auth-hero { min-height: 340px; }
 }
+.auth-hero-copy { margin-bottom: 24px; }

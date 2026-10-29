@@ -174,13 +174,6 @@
             <h1>Ваш объект под контролем на&nbsp;каждом пикете</h1>
             <p>Карта трассы, объёмы по слоям, подрядчики, геодезия и лаборатория. Данные вносят на объекте, WestSurvey проверяет и показывает их вам.</p>
           </div>
-          <div class="object-card">
-            <div>
-              <span>Объект заказчика</span>
-              <b>${esc(D.project.name)}</b>
-              <small>${esc(D.project.region)}</small>
-            </div>
-          </div>
         </section>
 
         <section class="auth-panel">
