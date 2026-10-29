@@ -351,7 +351,7 @@
     }).join('');
 
     wrap.innerHTML = `
-      <svg viewBox="0 0 1200 560" role="img" aria-label="Схема трассы с пикетами">
+      <div class="map-scroll"><svg viewBox="0 0 1200 560" role="img" aria-label="Схема трассы с пикетами">
         <defs>
           <pattern id="grass" width="22" height="22" patternUnits="userSpaceOnUse"><path d="M3 18l2-5M10 20l1-6M16 17l2-4" stroke="#d3d9c2" stroke-width="1.2"/></pattern>
         </defs>
@@ -373,7 +373,8 @@
         <g transform="translate(1150,500)"><path d="M0 -26 L8 0 L0 -6 L-8 0Z" fill="#16181d"/><text y="16" text-anchor="middle" font-size="12" font-weight="700">С</text></g>
         <g transform="translate(40,530)"><rect width="80" height="5" fill="#16181d"/><rect width="40" height="5" fill="#fff" stroke="#16181d"/><text y="-6" font-size="11" fill="#16181d">0</text><text x="80" y="-6" font-size="11" text-anchor="end" fill="#16181d">1 км</text></g>
         ${hits}
-      </svg>
+      </svg></div>
+      <div class="map-swipe">Проведите в сторону, чтобы увидеть всю трассу</div>
       <div class="map-note">Схема для прототипа. В рабочей версии здесь будет карта Mapbox: спутник, рельеф и трасса из KML.</div>
       <div class="map-legend">
         ${Object.entries(STATUS).map(([, s]) => `<div><span class="dot" style="background:${s.color}"></span>${s.name}</div>`).join('')}
@@ -459,7 +460,7 @@
       `<i class="rb-late ${matches(p) ? '' : 'off'}" style="left:${(p.i / N) * 100}%;width:${100 / N}%"></i>`).join('');
 
     const ticks = [];
-    for (let i = 0; i <= N; i += 20) ticks.push(`<span style="left:${(i / N) * 100}%">ПК ${i}</span>`);
+    for (let i = 0; i <= N; i += 20) ticks.push(`<span class="${i % 100 === 0 ? 'major' : ''}" style="left:${(i / N) * 100}%">ПК ${i}</span>`);
 
     el.innerHTML = `
       <div class="ribbon">
@@ -511,17 +512,17 @@
       const rows = D.pickets.filter(matches);
       $('#tbl').innerHTML = rows.length ? `
         <table class="list">
-          <thead><tr><th>Пикет</th><th>Км</th><th>Подрядчик</th><th>Статус</th><th>Готовность</th><th>Текущий этап</th><th>Выполнено</th><th>След. съёмка</th></tr></thead>
+          <thead><tr><th>Пикет</th><th class="hide-m">Км</th><th class="hide-m">Подрядчик</th><th>Статус</th><th>Готовность</th><th class="hide-m">Текущий этап</th><th class="hide-m">Выполнено</th><th class="hide-m">След. съёмка</th></tr></thead>
           <tbody>${rows.map((p) => `
             <tr data-pk="${p.i}" tabindex="0">
               <td><b>${p.label}</b></td>
-              <td class="num">${num(p.km)}</td>
-              <td>${esc(p.contractor.short)}</td>
+              <td class="num hide-m">${num(p.km)}</td>
+              <td class="hide-m">${esc(p.contractor.short)}</td>
               <td><span class="pill ${p.status}">${STATUS[p.status].name}</span></td>
               <td class="num"><span class="mini-bar"><i style="width:${pct(p.progress)}"></i></span>${pct(p.progress)}</td>
-              <td>${p.current === -1 ? 'Все этапы выполнены' : esc(p.stages[p.current].name)}</td>
-              <td class="num">${num(p.doneVolume, 0)} м³</td>
-              <td class="num">${date(p.nextSurvey)}</td>
+              <td class="hide-m">${p.current === -1 ? 'Все этапы выполнены' : esc(p.stages[p.current].name)}</td>
+              <td class="num hide-m">${num(p.doneVolume, 0)} м³</td>
+              <td class="num hide-m">${date(p.nextSurvey)}</td>
             </tr>`).join('')}</tbody>
         </table>` : '<p class="empty">Нет пикетов по выбранным условиям.</p>';
       $$('tbody tr').forEach((tr) => {
@@ -587,7 +588,7 @@
     m.setAttribute('aria-label', p.label);
     m.innerHTML = `
       <header class="pk-head">
-        <button class="btn ghost sm" data-close>${I.back}<span>К трассе</span></button>
+        <button class="btn ghost sm back-btn" data-close aria-label="К трассе">${I.back}<span>К трассе</span></button>
         <div class="title"><small>${esc(p.contractor.name)}</small><b>ПК ${p.i}+00 — ПК ${p.i + 1}+00</b></div>
         <span class="pill ${p.status}">${STATUS[p.status].name}</span>
         <div class="spacer"></div>
@@ -674,7 +675,8 @@
       return `
         <g class="xs-layer ${state.layer === L.id ? 'sel' : ''}" data-layer="${L.id}">
           <clipPath id="clip-${L.id}"><polygon points="${pts}"/></clipPath>
-          <polygon points="${pts}" fill="url(#pat-rest)"/>
+          <polygon points="${pts}" fill="#fff"/>
+          <polygon points="${pts}" fill="url(#pat-${L.id})" opacity=".45"/>
           <rect clip-path="url(#clip-${L.id})" x="${xl}" y="${y0}" width="${Math.max(0, fx - xl)}" height="${y1 - y0}" fill="url(#pat-${L.id})"/>
           ${L.frac > 0 && L.frac < 1 ? `<line clip-path="url(#clip-${L.id})" x1="${fx}" x2="${fx}" y1="${y0}" y2="${y1}" stroke="var(--work)" stroke-width="3"/>` : ''}
           <polygon class="xs-outline" points="${pts}" fill="none"/>
@@ -690,6 +692,7 @@
           <div>
             <h2>Поперечный профиль</h2>
             <p>${done} из ${p.layers.length} слоёв выполнено</p>
+            <p class="xs-legend"><i class="full"></i>выполнено <i></i>осталось</p>
           </div>
           <div class="xs-pct num">${Math.round(p.progress * 100)}<span>%</span></div>
         </div>
