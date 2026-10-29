@@ -90,6 +90,8 @@
 
   const fmtFile = (pk, s) => s.replace('{pk}', pk);
 
+  function generate() {
+  seed = 20261029;
   const pickets = [];
   let noise = 0;
   for (let i = 0; i < N; i++) {
@@ -189,13 +191,35 @@
       note: delayed ? 'Отставание от графика на 6 дней. Подрядчику направлено предписание.' : p === 1 ? 'Работы на пикете завершены, замечаний нет.' : '',
     });
   }
+  return pickets;
+  }
+
+  // Пересчёт производных полей пикета после внесения данных
+  function recompute(p) {
+    p.layers.forEach((L) => { L.frac = L.design ? clamp(L.done / L.design, 0, 1) : 0; });
+    const prog = p.layers.reduce((s, L) => s + L.frac, 0) / LAYERS.length;
+    p.progress = prog >= 0.999 ? 1 : prog;
+    p.plan = Math.max(p.plan, p.progress);
+    if (p.progress > 0) p.started = true;
+    p.stages.forEach((s, k) => {
+      if (k < 6) s.done = k === 0 ? p.started : p.progress >= STAGE_AT[k];
+      if (k === 6) s.done = p.progress >= 1;
+    });
+    p.current = p.stages.findIndex((s) => !s.done);
+    p.status = p.progress >= 1 ? 'done' : p.delayed ? 'late' : p.progress > 0 ? 'work' : 'none';
+    p.doneVolume = p.layers.filter((L) => L.unit === 'м³').reduce((s, L) => s + L.done, 0);
+    p.designVolume = p.layers.filter((L) => L.unit === 'м³').reduce((s, L) => s + L.design, 0);
+    p.events.sort((a, b) => b.date - a.date);
+  }
 
   function fmtNum(v) {
     return Number(v).toLocaleString('ru-RU', { maximumFractionDigits: 1 });
   }
 
   window.DATA = {
-    TODAY, N, LAYERS, STAGES, CONTRACTORS, SUPERVISION, pickets,
+    TODAY, N, LAYERS, STAGES, CONTRACTORS, SUPERVISION, MACHINES,
+    pickets: generate(),
+    generate, recompute,
     project: {
       name: 'Строительство автомобильной дороги',
       region: 'Актюбинская область',

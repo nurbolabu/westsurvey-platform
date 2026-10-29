@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Пример оси трассы (WGS84)</name>
+    <Placemark>
+      <name>Ось трассы</name>
+      <LineString><coordinates>57.395,50.25,0 57.42,50.241,0 57.446,50.23,0 57.47,50.221,0 57.493,50.209,0 57.517,50.2,0 57.541,50.186,0 57.566,50.177,0 57.59,50.163,0 57.613,50.153,0</coordinates></LineString>
+    </Placemark>
+    <Placemark><name>ПК 0</name><Point><coordinates>57.395,50.25,0</coordinates></Point></Placemark>
+    <Placemark><name>ПК 200</name><Point><coordinates>57.613,50.153,0</coordinates></Point></Placemark>
+  </Document>
+</kml>

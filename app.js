@@ -43,6 +43,12 @@
     flask: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6L4 20h16L14 9V3"/></svg>',
     alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 7v6M12 17h.01"/></svg>',
     logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>',
+    edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+    filter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18M6 12h12M10 19h4"/></svg>',
+    mountain: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 20 6-10 4 6 3-4 5 8Z"/></svg>',
+    expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
+    down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>',
+    upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
     menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>',
     phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg>',
   };
@@ -74,7 +80,7 @@
   function readHash() {
     const h = location.hash.replace(/^#\/?/, '');
     const [view, pkPart] = h.split('/');
-    state.view = ['overview', 'pickets', 'contractors'].includes(view) ? view : 'overview';
+    state.view = ['overview', 'pickets', 'contractors', 'entry'].includes(view) ? view : 'overview';
     const m = /^pk-(\d+)$/.exec(pkPart || '');
     state.pk = m && D.pickets[+m[1]] ? +m[1] : null;
   }
@@ -102,7 +108,7 @@
       <div class="login">
         <section class="login-brand">
           <svg class="contours" viewBox="0 0 800 900" preserveAspectRatio="none" aria-hidden="true">${contours(800, 900, 22, '#fff')}</svg>
-          <div class="brand"><img src="assets/logo.png" alt="">WESTSURVEY</div>
+          ${logosHTML().replace('logos', 'logos on-blue')}
           <div>
             <h1>Контроль строительства автодороги</h1>
             <p>Ход работ по каждому пикету: конструкция и объёмы, подрядчики, техника, геодезические съёмки и лабораторные испытания. ${esc(D.project.region)}.</p>
@@ -150,64 +156,91 @@
   }
 
   // ================= ПРИЛОЖЕНИЕ =================
+  const prefs = {
+    get(k, d) { try { const v = localStorage.getItem('ws_pref_' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('ws_pref_' + k, JSON.stringify(v)); } catch {} },
+  };
+  const NAV = [
+    { view: 'overview', icon: 'map', name: 'Карта и ход работ' },
+    { view: 'pickets', icon: 'list', name: 'Пикеты' },
+    { view: 'contractors', icon: 'users', name: 'Подрядчики' },
+    { view: 'entry', icon: 'edit', name: 'Ввод данных' },
+  ];
+  const DOCS_URL = 'https://github.com/nurbolabu/westsurvey-platform/blob/main/docs/ARCHITECTURE.md';
+  let mapCtl = null;
+
+  function logosHTML() {
+    return `
+      <div class="logos">
+        <span class="logo-box ws"><img src="assets/logo.png" alt=""><b>WESTSURVEY</b></span>
+        <span class="logo-sep" aria-hidden="true"></span>
+        <span class="logo-box kcs"><img src="assets/kazcomservice.png" alt="Kazcomservice"></span>
+      </div>`;
+  }
+
   function renderApp() {
     const u = state.user;
+    const navOpen = prefs.get('nav', window.innerWidth > 960);
+    const pending = WS.Store.list().filter((e) => e.status === 'pending').length;
+    if (mapCtl) { mapCtl.destroy(); mapCtl = null; }
     root.innerHTML = `
-      <div class="mobile-bar">
-        <button class="icon-btn" id="menuBtn" aria-label="Меню">${I.menu}</button>
-        <div class="brand"><img src="assets/logo.png" alt="">WESTSURVEY</div>
-      </div>
-      <div class="app">
+      <header class="appbar">
+        <button class="icon-btn ghosty" id="navToggle" aria-label="Показать или скрыть меню" aria-expanded="${navOpen}">${I.menu}</button>
+        ${logosHTML()}
+        <div class="appbar-project"><b>${esc(D.project.name)}</b><span>${esc(D.project.region)}, ПК 0 – ПК ${D.N}</span></div>
+        <div class="spacer"></div>
+        <form class="search" id="pkSearch" role="search">${I.search}<input inputmode="numeric" placeholder="Пикет, например 100" aria-label="Номер пикета"></form>
+        <div class="appbar-user">
+          <div class="avatar">${esc(initials(u.name).toUpperCase())}</div>
+          <div class="meta"><b>${esc(u.name)}</b><span>${esc(u.roleName)}</span></div>
+          <button class="icon-btn ghosty" id="logout" aria-label="Выйти" title="Выйти">${I.logout}</button>
+        </div>
+      </header>
+      <div class="app ${navOpen ? 'nav-open' : 'nav-closed'}" id="app">
         <aside class="sidebar" id="sidebar">
-          <div class="brand"><img src="assets/logo.png" alt="">WESTSURVEY</div>
-          <div>
-            <div class="nav-label">Объект</div>
-            <nav class="nav">
-              <button data-view="overview" ${state.view === 'overview' ? 'aria-current="page"' : ''}>${I.map}Схема трассы</button>
-              <button data-view="pickets" ${state.view === 'pickets' ? 'aria-current="page"' : ''}>${I.list}Пикеты</button>
-              <button data-view="contractors" ${state.view === 'contractors' ? 'aria-current="page"' : ''}>${I.users}Подрядчики</button>
-            </nav>
-          </div>
+          <nav class="nav">
+            ${NAV.map((n) => `<button data-view="${n.view}" ${state.view === n.view ? 'aria-current="page"' : ''}>${I[n.icon]}<span>${n.name}</span>${n.view === 'entry' && pending ? `<em class="badge">${pending}</em>` : ''}</button>`).join('')}
+          </nav>
+          <a class="side-link" href="${DOCS_URL}" target="_blank" rel="noopener">${I.doc}<span>Как устроена система</span></a>
           <div class="side-project">
             <b>${esc(D.project.name)}</b>
-            ${esc(D.project.region)}, ПК 0 – ПК ${D.N}, ${D.project.length} км
-          </div>
-          <div class="user">
-            <div class="avatar">${esc(initials(u.name).toUpperCase())}</div>
-            <div class="meta"><b>${esc(u.name)}</b><span>${esc(u.roleName)}</span></div>
-            <button class="icon-btn" id="logout" aria-label="Выйти" title="Выйти">${I.logout}</button>
+            ${esc(D.project.region)}, ${D.project.length} км, ${D.CONTRACTORS.length} подрядчика
           </div>
         </aside>
-        <main class="main" id="main"></main>
+        <div class="scrim" id="scrim"></div>
+        <main class="main ${state.view === 'overview' ? 'flush' : ''}" id="main"></main>
       </div>`;
-    $$('.nav button').forEach((b) => b.addEventListener('click', () => go(b.dataset.view)));
+    const setNav = (open) => {
+      $('#app').classList.toggle('nav-open', open);
+      $('#app').classList.toggle('nav-closed', !open);
+      $('#navToggle').setAttribute('aria-expanded', open);
+      prefs.set('nav', open);
+      if (mapCtl) setTimeout(() => mapCtl.resize(), 260);
+    };
+    $('#navToggle').addEventListener('click', () => setNav(!$('#app').classList.contains('nav-open')));
+    $('#scrim').addEventListener('click', () => setNav(false));
+    $$('.nav button').forEach((b) => b.addEventListener('click', () => { if (window.innerWidth <= 960) prefs.set('nav', false); go(b.dataset.view); }));
     $('#logout').addEventListener('click', () => { store.del('ws_user'); state.user = null; go('overview'); render(); });
-    $('#menuBtn').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
+    bindSearch();
 
     const main = $('#main');
     if (state.view === 'overview') renderOverview(main);
     if (state.view === 'pickets') renderPicketsView(main);
     if (state.view === 'contractors') renderContractors(main);
+    if (state.view === 'entry') renderEntry(main);
 
     if (state.pk !== null) openPicket(state.pk);
   }
 
   function topbar(title, crumbs) {
-    return `
-      <div class="topbar">
-        <div><div class="crumbs">${crumbs}</div><h1>${title}</h1></div>
-        <div class="spacer"></div>
-        <form class="search" id="pkSearch" role="search">
-          ${I.search}<input inputmode="numeric" placeholder="Перейти к пикету, например 100" aria-label="Номер пикета">
-        </form>
-      </div>`;
+    return `<div class="topbar"><div><div class="crumbs">${crumbs}</div><h1>${title}</h1></div></div>`;
   }
   function bindSearch() {
     const f = $('#pkSearch');
     f.addEventListener('submit', (e) => {
       e.preventDefault();
       const n = parseInt(f.querySelector('input').value.replace(/\D/g, ''), 10);
-      if (!isNaN(n) && D.pickets[n]) go(state.view, n);
+      if (!isNaN(n) && D.pickets[n]) { f.querySelector('input').value = ''; go(state.view, n); }
       else f.querySelector('input').value = '';
     });
   }
@@ -232,30 +265,65 @@
   function renderOverview(main) {
     const t = totals();
     const lag = t.plan - t.prog;
+    const base = prefs.get('base', 'sat');
+    const hasLib = WSMap.available();
+    const geo = WSMap.geometry();
     main.innerHTML = `
-      ${topbar('Схема трассы', `${esc(D.project.region)}, данные на ${date(D.TODAY)}`)}
-      <div class="kpis">
-        <div class="kpi accent">
-          <span>Общая готовность</span>
-          <b class="num">${pctD(t.prog)}</b>
-          <div class="bar plan"><i style="width:${pct(t.prog)}"></i><em style="left:${pct(t.plan)}"></em></div>
-          <small>План на сегодня ${pctD(t.plan)}${lag > 0.002 ? `, отставание ${pctD(lag)}` : ''}</small>
-        </div>
-        <div class="kpi"><span>Пикетов в работе</span><b class="num">${t.work + t.late}</b><small>из ${D.N}, ещё не начато ${t.none}</small></div>
-        <div class="kpi ${t.late ? 'warn' : ''}"><span>С отставанием</span><b class="num">${t.late}</b><small>${plural(t.late, 'пикет', 'пикета', 'пикетов')} отстают от графика</small></div>
-        <div class="kpi"><span>Земляные работы</span><b class="num">${num(t.vol / 1000, 1)}<small> тыс. м³</small></b><small>из ${num(t.volDesign / 1000, 0)} тыс. м³ по проекту</small></div>
-        <div class="kpi"><span>Техника на объекте</span><b class="num">${t.mach}</b><small>единиц сегодня</small></div>
-        <div class="kpi"><span>Рабочие</span><b class="num">${t.workers}</b><small>человек на смене</small></div>
-      </div>
-      <div class="grid-2">
-        <section class="card">
-          <div class="card-head">
-            <h2>Трасса ПК 0 – ПК ${D.N}</h2>
-            <div class="spacer"></div>
-            ${filterControls()}
+      <section class="map-hero" id="mapHero">
+        <div class="map-canvas" id="mapCanvas" ${base === 'sat' && hasLib ? '' : 'hidden'}></div>
+        <div class="scheme-layer" ${base === 'scheme' || !hasLib ? '' : 'hidden'}><div class="map-wrap" id="mapWrap"></div></div>
+
+        <div class="map-ui tl">
+          <div class="float-card filters-card" id="filtersCard">
+            <div class="fc-head">
+              <div><b>Трасса ПК 0 – ПК ${D.N}</b><span>${esc(geo.name)}, ${num(geo.length / 1000, 1)} км</span></div>
+              <button class="icon-btn sm fc-toggle" id="fcToggle" aria-label="Фильтры" aria-expanded="true">${I.filter}</button>
+            </div>
+            <div class="fc-body">${filterControls()}</div>
           </div>
-          <div class="map-wrap" id="mapWrap"></div>
-        </section>
+        </div>
+
+        <div class="map-ui tr">
+          <div class="seg glass" role="group" aria-label="Подложка">
+            <button data-base="sat" aria-pressed="${base === 'sat'}" ${hasLib ? '' : 'disabled'}>Спутник</button>
+            <button data-base="scheme" aria-pressed="${base === 'scheme' || !hasLib}">Схема</button>
+          </div>
+          <button class="btn glass sm" id="terrainBtn" aria-pressed="false" ${base === 'sat' && hasLib ? '' : 'hidden'}>${I.mountain}3D рельеф</button>
+          <button class="btn glass sm" id="fitBtn" ${base === 'sat' && hasLib ? '' : 'hidden'}>${I.expand}Вся трасса</button>
+        </div>
+
+        <div class="map-ui bl">
+          <div class="float-card legend-card">
+            ${Object.entries(STATUS).map(([, s]) => `<span><i class="dot" style="background:${s.color}"></i>${s.name}</span>`).join('')}
+          </div>
+        </div>
+
+        <div class="map-ui br-progress">
+          <div class="float-card progress-card">
+            <span>Общая готовность</span>
+            <b class="num">${pctD(t.prog)}</b>
+            <div class="bar plan"><i style="width:${pct(t.prog)}"></i><em style="left:${pct(t.plan)}"></em></div>
+            <small>План ${pctD(t.plan)}${lag > 0.002 ? `, отставание ${pctD(lag)}` : ''}</small>
+          </div>
+        </div>
+
+        <button class="scroll-cue" id="scrollCue">${I.down}Показатели и график</button>
+      </section>
+
+      <div class="below" id="below">
+        <div class="kpis">
+          <div class="kpi accent">
+            <span>Общая готовность</span>
+            <b class="num">${pctD(t.prog)}</b>
+            <div class="bar plan"><i style="width:${pct(t.prog)}"></i><em style="left:${pct(t.plan)}"></em></div>
+            <small>План на сегодня ${pctD(t.plan)}${lag > 0.002 ? `, отставание ${pctD(lag)}` : ''}</small>
+          </div>
+          <div class="kpi"><span>Пикетов в работе</span><b class="num">${t.work + t.late}</b><small>из ${D.N}, ещё не начато ${t.none}</small></div>
+          <div class="kpi ${t.late ? 'warn' : ''}"><span>С отставанием</span><b class="num">${t.late}</b><small>${plural(t.late, 'пикет', 'пикета', 'пикетов')} отстают от графика</small></div>
+          <div class="kpi"><span>Земляные работы</span><b class="num">${num(t.vol / 1000, 1)}<small> тыс. м³</small></b><small>из ${num(t.volDesign / 1000, 0)} тыс. м³ по проекту</small></div>
+          <div class="kpi"><span>Техника на объекте</span><b class="num">${t.mach}</b><small>единиц сегодня</small></div>
+          <div class="kpi"><span>Рабочие</span><b class="num">${t.workers}</b><small>человек на смене</small></div>
+        </div>
         <section class="card">
           <div class="card-head">
             <div>
@@ -269,10 +337,37 @@
           <div class="ribbon-scroll" id="ribbon"></div>
         </section>
       </div>`;
-    bindSearch();
-    bindFilters(() => { drawMap(); drawRibbon(); });
+
+    const redraw = () => { if (mapCtl) mapCtl.update(); drawMap(); drawRibbon(); };
+    bindFilters(redraw);
     drawMap();
     drawRibbon();
+
+    if (base === 'sat' && hasLib) {
+      mapCtl = WSMap.mount($('#mapCanvas'), {
+        color: (p) => STATUS[p.status].hex,
+        matches,
+        padding: window.innerWidth < 700 ? { top: 150, bottom: 150, left: 40, right: 40 } : { top: 180, bottom: 150, left: 110, right: 290 },
+        onHover: (e, i) => showTip(e, D.pickets[i]),
+        onLeave: hideTip,
+        onPick: (i) => { hideTip(); go(state.view, i); },
+      });
+    }
+
+    $$('[data-base]').forEach((b) => b.addEventListener('click', () => { prefs.set('base', b.dataset.base); renderApp(); }));
+    $('#terrainBtn').addEventListener('click', (e) => {
+      const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+      e.currentTarget.setAttribute('aria-pressed', on);
+      mapCtl && mapCtl.terrain(on);
+    });
+    $('#fitBtn').addEventListener('click', () => mapCtl && mapCtl.fit());
+    $('#fcToggle').addEventListener('click', (e) => {
+      const card = $('#filtersCard');
+      card.classList.toggle('collapsed');
+      e.currentTarget.setAttribute('aria-expanded', !card.classList.contains('collapsed'));
+    });
+    if (window.innerWidth < 700) $('#filtersCard').classList.add('collapsed');
+    $('#scrollCue').addEventListener('click', () => $('#below').scrollIntoView({ behavior: 'smooth' }));
   }
 
   function filterControls() {
@@ -375,10 +470,8 @@
         ${hits}
       </svg></div>
       <div class="map-swipe">Проведите в сторону, чтобы увидеть всю трассу</div>
-      <div class="map-note">Схема для прототипа. В рабочей версии здесь будет карта Mapbox: спутник, рельеф и трасса из KML.</div>
-      <div class="map-legend">
-        ${Object.entries(STATUS).map(([, s]) => `<div><span class="dot" style="background:${s.color}"></span>${s.name}</div>`).join('')}
-      </div>`;
+      <div class="map-note">Упрощённая схема трассы. Спутник и рельеф: кнопка «Спутник» справа вверху.</div>
+`;
 
     $$('.pk-hit', wrap).forEach((el) => {
       const p = D.pickets[+el.dataset.pk];
@@ -571,6 +664,368 @@
 
   function personHTML(p) {
     return `<div class="person"><div class="avatar">${esc(initials(p.name))}</div><div class="meta"><b>${esc(p.name)}</b><span>${esc(p.role)}</span><a href="tel:${p.phone.replace(/\s/g, '')}">${esc(p.phone)}</a></div></div>`;
+  }
+
+  // ================= ВВОД ДАННЫХ =================
+  const ENTRY_TABS = [
+    { id: 'report', name: 'Отчёт о работах', who: 'Прораб подрядчика' },
+    { id: 'survey', name: 'Геодезия', who: 'Геодезист WestSurvey' },
+    { id: 'lab', name: 'Лаборатория', who: 'Лаборатория' },
+    { id: 'route', name: 'Трасса и проект', who: 'Администратор' },
+    { id: 'journal', name: 'Журнал и подтверждение', who: 'Технадзор, заказчик' },
+  ];
+  const SURVEY_KINDS = ['Исполнительная съёмка', 'Акт разбивки', 'Контрольная съёмка', 'Продольный профиль'];
+  const LAB_TESTS = [
+    { name: 'Коэффициент уплотнения', hint: 'например 0,96 (норма ≥ 0,95)' },
+    { name: 'Влажность грунта', hint: 'например 12 %' },
+    { name: 'Гранулометрический состав', hint: 'например соответствует ГОСТ' },
+    { name: 'Прочность щебня', hint: 'например М600' },
+  ];
+  const todayISO = () => D.TODAY.toISOString().slice(0, 10);
+  const canApprove = () => ['customer', 'supervision'].includes(state.user.role);
+  const fileSize = (b) => (b > 1048576 ? num(b / 1048576, 1) + ' МБ' : num(b / 1024, 0) + ' КБ');
+
+  function toast(msg) {
+    $('.toast')?.remove();
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.setAttribute('role', 'status');
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3200);
+  }
+
+  function rangeFields(from = 100, to = 105) {
+    return `
+      <div class="f-row two">
+        <label class="field"><span>С пикета</span><input name="pkFrom" type="number" min="0" max="${D.N - 1}" value="${from}" required></label>
+        <label class="field"><span>По пикет</span><input name="pkTo" type="number" min="1" max="${D.N}" value="${to}" required></label>
+      </div>`;
+  }
+  const layerOptions = (sel) => D.LAYERS.map((L) => `<option value="${L.id}" ${L.id === sel ? 'selected' : ''}>${esc(L.name)}</option>`).join('');
+
+  function renderEntry(main) {
+    const tab = prefs.get('entryTab', 'report');
+    const list = WS.Store.list();
+    const pending = list.filter((e) => e.status === 'pending').length;
+    main.innerHTML = `
+      ${topbar('Ввод данных', 'Всё, что вносится здесь, после подтверждения технадзором попадает на карту, в график и в окна пикетов')}
+      <div class="flow">
+        <div><b>1. Вносит ответственный</b><span>прораб, геодезист или лаборатория, с телефона на объекте</span></div>
+        <div><b>2. Подтверждает технадзор</b><span>или заказчик проверяет объём и документы</span></div>
+        <div><b>3. Обновляется платформа</b><span>карта, линейный график, паспорт пикета, журнал</span></div>
+      </div>
+      <div class="tabs" role="tablist">
+        ${ENTRY_TABS.map((t) => `<button role="tab" data-tab="${t.id}" aria-selected="${t.id === tab}">${t.name}${t.id === 'journal' && pending ? `<em class="badge">${pending}</em>` : ''}</button>`).join('')}
+      </div>
+      <div id="entryBody"></div>`;
+    $$('[data-tab]').forEach((b) => b.addEventListener('click', () => { prefs.set('entryTab', b.dataset.tab); renderEntry(main); }));
+    $('.tabs [aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    const body = $('#entryBody');
+    ({ report: entryReport, survey: entrySurvey, lab: entryLab, route: entryRoute, journal: entryJournal })[tab](body);
+  }
+
+  function submitEntry(form, entry) {
+    const from = +form.pkFrom.value, to = +form.pkTo.value;
+    if (!(to > from)) { toast('Конечный пикет должен быть больше начального'); return false; }
+    WS.Store.add({ ...entry, pkFrom: from, pkTo: to, author: `${state.user.name}, ${state.user.roleName}` });
+    toast('Отправлено на подтверждение технадзору');
+    prefs.set('entryTab', 'journal');
+    renderApp();
+    return true;
+  }
+
+  function entryReport(body) {
+    body.innerHTML = `
+      <div class="entry-grid">
+        <form class="card form" id="fReport">
+          <h3>Ежедневный отчёт о выполненных работах</h3>
+          ${rangeFields()}
+          <label class="field"><span>Слой конструкции</span><select name="layer">${layerOptions('s1')}</select></label>
+          <div class="f-row two">
+            <label class="field"><span>Объём за смену, <em id="unit">м³</em></span><input name="volume" type="number" min="0" step="0.1" placeholder="0" required></label>
+            <label class="field"><span>Дата</span><input name="date" type="date" value="${todayISO()}" max="${todayISO()}" required></label>
+          </div>
+          <p class="hint" id="remain"></p>
+          <fieldset class="field"><legend>Техника на участке</legend>
+            <div class="checks">${D.MACHINES.map((m) => `<label class="check"><input type="checkbox" name="mach" value="${m}"><span>${m}</span></label>`).join('')}</div>
+          </fieldset>
+          <div class="f-row two">
+            <label class="field"><span>Рабочих на смене</span><input name="workers" type="number" min="0" placeholder="0"></label>
+            <label class="field"><span>Фото с объекта</span><input name="photos" type="file" accept="image/*" multiple capture="environment"></label>
+          </div>
+          <label class="field"><span>Комментарий</span><textarea name="note" rows="2" placeholder="Например: отсыпка слоя I, вывозка грунта из карьера №1"></textarea></label>
+          <button class="btn" type="submit">Отправить отчёт</button>
+        </form>
+        ${entryAside('report')}
+      </div>`;
+    const f = $('#fReport');
+    const upd = () => {
+      const L = D.LAYERS.find((x) => x.id === f.layer.value);
+      $('#unit').textContent = L.unit;
+      const k = D.LAYERS.indexOf(L);
+      const ps = D.pickets.filter((p) => p.i >= +f.pkFrom.value && p.i < +f.pkTo.value);
+      const rem = ps.reduce((s, p) => s + Math.max(0, p.layers[k].design - p.layers[k].done), 0);
+      const contr = [...new Set(ps.map((p) => p.contractor.short))].join(', ');
+      $('#remain').innerHTML = ps.length ? `Остаток по проекту на ПК ${f.pkFrom.value} – ${f.pkTo.value}: <b>${num(rem)} ${L.unit}</b>. Участок: ${esc(contr)}.` : 'Укажите участок пикетов.';
+    };
+    ['layer', 'pkFrom', 'pkTo'].forEach((n) => f[n].addEventListener('input', upd));
+    upd();
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      submitEntry(f, {
+        type: 'report', layer: f.layer.value, volume: +f.volume.value, date: f.date.value,
+        machinery: $$('input[name=mach]:checked', f).map((x) => x.value), workers: +f.workers.value || 0,
+        photos: f.photos.files.length, note: f.note.value.trim(),
+      });
+    });
+  }
+
+  function entrySurvey(body) {
+    body.innerHTML = `
+      <div class="entry-grid">
+        <form class="card form" id="fSurvey">
+          <h3>Геодезическая съёмка или акт</h3>
+          <label class="field"><span>Вид документа</span><select name="kind">${SURVEY_KINDS.map((k) => `<option>${k}</option>`).join('')}</select></label>
+          ${rangeFields(95, 105)}
+          <div class="f-row two">
+            <label class="field"><span>Дата съёмки</span><input name="date" type="date" value="${todayISO()}" required></label>
+            <label class="field"><span>Следующая съёмка</span><input name="next" type="date" value="${new Date(D.TODAY.getTime() + 14 * 86400000).toISOString().slice(0, 10)}"></label>
+          </div>
+          <label class="field"><span>Файл (DWG, PDF, CSV с точками)</span><input name="file" type="file" accept=".dwg,.dxf,.pdf,.csv,.txt,.kml"></label>
+          <button class="btn" type="submit">Загрузить</button>
+        </form>
+        ${entryAside('survey')}
+      </div>`;
+    const f = $('#fSurvey');
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const file = f.file.files[0];
+      submitEntry(f, { type: 'survey', kind: f.kind.value, date: f.date.value, next: f.next.value, fileName: file ? file.name : '', fileSize: file ? fileSize(file.size) : '' });
+    });
+  }
+
+  function entryLab(body) {
+    body.innerHTML = `
+      <div class="entry-grid">
+        <form class="card form" id="fLab">
+          <h3>Протокол лабораторного испытания</h3>
+          <div class="f-row two">
+            <label class="field"><span>Испытание</span><select name="test">${LAB_TESTS.map((t) => `<option>${t.name}</option>`).join('')}</select></label>
+            <label class="field"><span>Слой</span><select name="layer">${layerOptions('s1')}</select></label>
+          </div>
+          ${rangeFields(100, 103)}
+          <div class="f-row two">
+            <label class="field"><span>Результат</span><input name="value" placeholder="${LAB_TESTS[0].hint}" required></label>
+            <label class="field"><span>Дата</span><input name="date" type="date" value="${todayISO()}" required></label>
+          </div>
+          <div class="seg" role="radiogroup" aria-label="Соответствие норме">
+            <label><input type="radio" name="ok" value="1" checked><span>Соответствует норме</span></label>
+            <label><input type="radio" name="ok" value="0"><span>Не соответствует</span></label>
+          </div>
+          <label class="field"><span>Протокол (PDF, фото)</span><input name="file" type="file" accept=".pdf,image/*"></label>
+          <button class="btn" type="submit">Отправить протокол</button>
+        </form>
+        ${entryAside('lab')}
+      </div>`;
+    const f = $('#fLab');
+    f.test.addEventListener('change', () => { f.value.placeholder = LAB_TESTS.find((t) => t.name === f.test.value).hint; });
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const file = f.file.files[0];
+      submitEntry(f, { type: 'lab', test: f.test.value, layer: f.layer.value, value: f.value.value.trim(), ok: f.ok.value === '1', date: f.date.value, fileName: file ? file.name : '', fileSize: file ? fileSize(file.size) : '' });
+    });
+  }
+
+  function entryRoute(body) {
+    const geo = WSMap.geometry();
+    const tok = WS.Store.token();
+    body.innerHTML = `
+      <div class="entry-grid">
+        <div class="stack-col">
+          <section class="card form">
+            <h3>Ось трассы из AutoCAD</h3>
+            <p class="hint">Загрузите ось трассы в формате KML или GeoJSON в координатах WGS84. Пикеты расставятся по оси автоматически, через каждые ${window.WS_CONFIG.picketStep} м.</p>
+            <div class="route-now">
+              <div><span>Сейчас на карте</span><b>${esc(geo.name)}</b></div>
+              <div><span>Длина оси</span><b class="num">${num(geo.length / 1000, 2)} км</b></div>
+              <div><span>Шаг пикетов</span><b class="num">${num(geo.step, 1)} м</b></div>
+            </div>
+            <label class="drop" id="drop">
+              <input type="file" id="routeFile" accept=".kml,.geojson,.json">
+              ${I.upload}<b>Выберите файл KML или GeoJSON</b><span>или перетащите его сюда</span>
+            </label>
+            <p class="hint">Нет файла под рукой? <a href="templates/example_route.kml" download>Скачайте пример KML</a> и загрузите его, чтобы посмотреть, как работает импорт.</p>
+            <div id="routePreview"></div>
+            ${geo.imported ? '<button class="btn ghost" id="routeReset" type="button">Вернуть демо-трассу</button>' : ''}
+          </section>
+          <section class="card form">
+            <h3>Проектные объёмы по пикетам</h3>
+            <p class="hint">CSV из сметы или ведомости объёмов: одна строка на пикет и слой. Разделитель запятая или точка с запятой.</p>
+            <a class="btn ghost sm" href="templates/design_volumes_template.csv" download>${I.doc}Скачать шаблон CSV</a>
+            <label class="drop small"><input type="file" id="csvFile" accept=".csv,.txt">${I.upload}<b>Загрузить CSV с объёмами</b></label>
+            <div id="csvPreview"></div>
+          </section>
+        </div>
+        <div class="stack-col">
+          <section class="card form">
+            <h3>Карта Mapbox</h3>
+            <p class="hint">Без токена карта работает на бесплатных снимках Esri и открытом рельефе. С токеном Mapbox подключаются снимки Mapbox Satellite и рельеф Mapbox Terrain. Токен сохраняется только в этом браузере.</p>
+            <form id="fToken" class="f-row token-row">
+              <label class="field"><span>Публичный токен (pk.…)</span><input name="token" value="${esc(tok)}" placeholder="pk.eyJ1Ijoi…" autocomplete="off" spellcheck="false"></label>
+              <button class="btn" type="submit">Сохранить</button>
+            </form>
+            <p class="hint">Сейчас подложка: <b>${tok ? 'Mapbox Satellite' : 'Esri World Imagery'}</b>.</p>
+          </section>
+          ${entryAside('route')}
+        </div>
+      </div>`;
+
+    let parsed = null;
+    const file = $('#routeFile');
+    const drop = $('#drop');
+    const read = (fl) => {
+      if (!fl) return;
+      const r = new FileReader();
+      r.onload = () => {
+        try {
+          parsed = WSMap.parseRouteFile(String(r.result), fl.name);
+          $('#routePreview').innerHTML = `
+            <div class="preview">
+              ${routeSVG(parsed.coords)}
+              <dl class="kv">
+                <dt>Файл</dt><dd>${esc(fl.name)}</dd>
+                <dt>Длина оси</dt><dd>${num(parsed.length / 1000, 2)} км</dd>
+                <dt>Точек оси</dt><dd>${parsed.coords.length}</dd>
+                <dt>Точек «ПК» в файле</dt><dd>${parsed.pickets || 'нет'}</dd>
+                <dt>Пикетов по 100 м</dt><dd>${Math.floor(parsed.length / 100)}</dd>
+              </dl>
+              <button class="btn" id="routeApply" type="button">Показать эту трассу на карте</button>
+            </div>`;
+          $('#routeApply').addEventListener('click', () => {
+            WS.Store.setRoute(parsed);
+            toast('Трасса обновлена');
+            go('overview');
+          });
+        } catch (err) {
+          $('#routePreview').innerHTML = `<p class="error-box">${esc(err.message)}</p>`;
+        }
+      };
+      r.readAsText(fl);
+    };
+    file.addEventListener('change', () => read(file.files[0]));
+    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); read(e.dataTransfer.files[0]); });
+    $('#routeReset')?.addEventListener('click', () => { WS.Store.clearRoute(); toast('Возвращена демо-трасса'); renderApp(); });
+
+    $('#csvFile').addEventListener('change', (e) => {
+      const fl = e.target.files[0];
+      if (!fl) return;
+      const r = new FileReader();
+      r.onload = () => {
+        const rows = [], errors = [];
+        String(r.result).split(/\r?\n/).forEach((line, n) => {
+          const c = line.split(/[;,\t]/).map((x) => x.trim());
+          if (!line.trim() || n === 0 && isNaN(+c[0])) return;
+          const pk = parseInt(c[0], 10);
+          const L = D.LAYERS.find((x) => x.id === c[1] || x.short.toLowerCase() === (c[1] || '').toLowerCase());
+          const vol = parseFloat((c[2] || '').replace(',', '.'));
+          if (isNaN(pk) || !D.pickets[pk] || !L || isNaN(vol)) errors.push(n + 1);
+          else rows.push({ pk, layer: L.id, volume: vol });
+        });
+        $('#csvPreview').innerHTML = `
+          <div class="preview">
+            <p>Строк распознано: <b>${rows.length}</b>${errors.length ? `, с ошибками: <b>${errors.length}</b> (строки ${errors.slice(0, 8).join(', ')}${errors.length > 8 ? '…' : ''})` : ''}.</p>
+            ${rows.length ? '<button class="btn" id="csvApply" type="button">Отправить на подтверждение</button>' : ''}
+          </div>`;
+        $('#csvApply')?.addEventListener('click', () => {
+          const pks = rows.map((x) => x.pk);
+          WS.Store.add({ type: 'design', rows, fileName: fl.name, pkFrom: Math.min(...pks), pkTo: Math.max(...pks) + 1, author: `${state.user.name}, ${state.user.roleName}` });
+          toast('Проектные объёмы отправлены на подтверждение');
+          prefs.set('entryTab', 'journal');
+          renderApp();
+        });
+      };
+      r.readAsText(fl);
+    });
+
+    $('#fToken').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const v = e.target.token.value.trim();
+      if (v && !/^pk\./.test(v)) { toast('Нужен публичный токен, он начинается с pk.'); return; }
+      WS.Store.setToken(v);
+      toast(v ? 'Токен сохранён, карта переключена на Mapbox' : 'Токен удалён');
+      renderApp();
+    });
+  }
+
+  function routeSVG(coords) {
+    const xs = coords.map((c) => c[0]), ys = coords.map((c) => c[1]);
+    const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+    const k = Math.cos(((y0 + y1) / 2) * Math.PI / 180);
+    const w = (x1 - x0) * k || 1e-6, h = y1 - y0 || 1e-6, s = Math.min(280 / w, 120 / h);
+    const pts = coords.map(([x, y]) => `${(10 + (x - x0) * k * s).toFixed(1)},${(130 - (y - y0) * s).toFixed(1)}`).join(' ');
+    return `<svg class="route-svg" viewBox="0 0 300 140" role="img" aria-label="Предпросмотр оси трассы"><polyline points="${pts}" fill="none" stroke="#0B41C7" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+  }
+
+  function entryAside(kind) {
+    const tips = {
+      report: ['Один отчёт на смену и слой. Участок задаётся пикетами: ПК 100 – 105 значит пикеты 100, 101, 102, 103, 104.',
+        'Объём распределяется по пикетам пропорционально проектному остатку.',
+        'Техника и люди, указанные сегодняшним числом, показываются на карте как активный фронт работ.'],
+      survey: ['Исполнительная съёмка обновляет дату последней съёмки на пикетах и ставит дату следующей.',
+        'Файл DWG или PDF прикрепляется к каждому пикету участка во вкладке «Геодезия».'],
+      lab: ['Результат «Не соответствует» попадает в журнал пикета красным и виден технадзору.',
+        'Протокол прикрепляется к пикетам во вкладке «Лаборатория».'],
+      route: ['Экспорт из AutoCAD Civil 3D: команда MAPEXPORT в KML или SHP. Затем перепроецирование в WGS84 (EPSG:4326) в QGIS.',
+        'Если чертёж в местной системе координат (МСК), без перепроецирования трасса окажется не на своём месте.',
+        'Подробно о данных для карты и бэкенде: раздел «Как устроена система» в меню.'],
+    };
+    return `<aside class="card tips"><h3>Как заполнять</h3><ul>${tips[kind].map((t) => `<li>${esc(t)}</li>`).join('')}</ul></aside>`;
+  }
+
+  function entryJournal(body) {
+    const list = WS.Store.list();
+    const desc = (e) => {
+      const L = D.LAYERS.find((x) => x.id === e.layer);
+      if (e.type === 'report') return `${L ? L.name : ''}: ${num(e.volume)} ${L ? L.unit : ''}${e.machinery && e.machinery.length ? `, техника: ${e.machinery.join(', ')}` : ''}${e.workers ? `, рабочих ${e.workers}` : ''}`;
+      if (e.type === 'survey') return `${e.kind}${e.fileName ? `, файл ${e.fileName}` : ''}${e.next ? `, следующая ${date(new Date(e.next))}` : ''}`;
+      if (e.type === 'lab') return `${e.test}: ${e.value}, ${e.ok ? 'соответствует' : 'не соответствует'} (${L ? L.short : ''})`;
+      if (e.type === 'design') return `${e.rows.length} строк проектных объёмов из ${e.fileName}`;
+      return '';
+    };
+    const st = { pending: ['work', 'Ожидает подтверждения'], approved: ['done', 'Подтверждено'], rejected: ['late', 'Отклонено'] };
+    body.innerHTML = list.length ? `
+      <section class="card">
+        <div class="card-head"><h3>Внесённые данные</h3><div class="spacer"></div>
+          <span class="muted" style="font-size:12.5px">${canApprove() ? 'Вы можете подтверждать записи' : 'Подтверждает технадзор или заказчик'}</span></div>
+        <ul class="journal">${list.map((e) => `
+          <li>
+            <div class="j-main">
+              <div class="j-top"><b>${WS.ENTRY_TYPES[e.type]}</b><span class="pill ${st[e.status][0]}">${st[e.status][1]}</span></div>
+              <p>ПК ${e.pkFrom} – ${e.pkTo}${e.date ? `, ${date(new Date(e.date))}` : ''}. ${esc(desc(e))}</p>
+              ${e.note ? `<p class="muted">${esc(e.note)}</p>` : ''}
+              <small class="muted">${esc(e.author || '')}, внесено ${new Date(e.createdAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}${e.reviewedBy ? `. Проверил: ${esc(e.reviewedBy)}` : ''}</small>
+            </div>
+            <div class="j-actions">
+              ${e.status === 'pending' && canApprove() ? `<button class="btn sm" data-approve="${e.id}">${I.check}Подтвердить</button><button class="btn ghost sm" data-reject="${e.id}">Отклонить</button>` : ''}
+              ${e.status === 'approved' ? `<button class="btn ghost sm" data-open="${e.pkFrom}">Открыть ПК ${e.pkFrom}</button>` : ''}
+              ${e.status !== 'approved' ? `<button class="btn ghost sm" data-del="${e.id}">Удалить</button>` : ''}
+            </div>
+          </li>`).join('')}</ul>
+      </section>` : `
+      <section class="card empty-state">
+        <h3>Записей пока нет</h3>
+        <p>Внесите первый отчёт о работах, геодезическую съёмку или протокол лаборатории. Они появятся здесь для подтверждения.</p>
+        <button class="btn" id="toReport">Внести отчёт о работах</button>
+      </section>`;
+    const by = `${state.user.name}, ${state.user.roleName}`;
+    $$('[data-approve]').forEach((b) => b.addEventListener('click', () => { WS.Store.setStatus(b.dataset.approve, 'approved', by); WS.refresh(); toast('Подтверждено, данные обновлены на карте и в графике'); renderApp(); }));
+    $$('[data-reject]').forEach((b) => b.addEventListener('click', () => { WS.Store.setStatus(b.dataset.reject, 'rejected', by); toast('Запись отклонена'); renderApp(); }));
+    $$('[data-del]').forEach((b) => b.addEventListener('click', () => { WS.Store.remove(b.dataset.del); toast('Запись удалена'); renderApp(); }));
+    $$('[data-open]').forEach((b) => b.addEventListener('click', () => go('entry', +b.dataset.open)));
+    $('#toReport')?.addEventListener('click', () => { prefs.set('entryTab', 'report'); renderApp(); });
   }
 
   // ================= ОКНО ПИКЕТА =================
