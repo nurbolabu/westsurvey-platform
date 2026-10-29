@@ -1,8 +1,9 @@
 /*
   Карта трассы на MapLibre GL (совместима со стилями и тайлами Mapbox).
   Источники:
-    - с токеном Mapbox: спутник Mapbox Satellite Streets и рельеф Mapbox Terrain DEM;
-    - без токена: снимки Esri World Imagery и рельеф AWS Terrain Tiles.
+    - с токеном Mapbox: спутник Mapbox Satellite Streets;
+    - без токена: снимки Esri World Imagery;
+    - рельеф всегда из AWS Terrain Tiles.
   Геометрия трассы: загруженный KML/GeoJSON (Ввод данных → Трасса) или демо-линия
   из config.js. Пикеты строятся по оси трассы через каждые picketStep метров.
 */
@@ -76,9 +77,9 @@
     const sat = token
       ? { type: 'raster', tiles: [`https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${token}`], tileSize: 512, maxzoom: 20, attribution: '© Mapbox © OpenStreetMap © Maxar' }
       : { type: 'raster', tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], tileSize: 256, maxzoom: 19, attribution: 'Снимки © Esri, Maxar, Earthstar Geographics' };
-    const dem = () => (token
-      ? { type: 'raster-dem', tiles: [`https://api.mapbox.com/v4/mapbox.mapbox-terrain-dem-v1/{z}/{x}/{y}.pngraw?access_token=${token}`], tileSize: 512, maxzoom: 14, encoding: 'mapbox' }
-      : { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 15, encoding: 'terrarium', attribution: 'Рельеф © Mapzen, AWS Terrain Tiles' });
+    // Рельеф Mapbox Terrain DEM отдаётся только библиотеке Mapbox GL JS (для MapLibre отвечает 429),
+    // поэтому рельеф всегда берём из открытых AWS Terrain Tiles.
+    const dem = () => ({ type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 15, encoding: 'terrarium', attribution: 'Рельеф © Mapzen, AWS Terrain Tiles' });
     const sources = { sat, dem: dem(), demShade: dem() };
     const layers = [
       { id: 'sat', type: 'raster', source: 'sat' },

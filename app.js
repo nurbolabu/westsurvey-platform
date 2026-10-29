@@ -870,7 +870,7 @@
         <div class="stack-col">
           <section class="card form">
             <h3>Карта Mapbox</h3>
-            <p class="hint">Без токена карта работает на бесплатных снимках Esri и открытом рельефе. С токеном Mapbox подключаются снимки Mapbox Satellite и рельеф Mapbox Terrain. Токен сохраняется только в этом браузере.</p>
+            <p class="hint">Без токена карта работает на бесплатных снимках Esri и открытом рельефе. С токеном Mapbox подключаются снимки Mapbox Satellite. Токен сохраняется только в этом браузере.</p>
             <form id="fToken" class="f-row token-row">
               <label class="field"><span>Публичный токен (pk.…)</span><input name="token" value="${esc(tok)}" placeholder="pk.eyJ1Ijoi…" autocomplete="off" spellcheck="false"></label>
               <button class="btn" type="submit">Сохранить</button>

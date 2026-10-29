@@ -2,8 +2,8 @@
   Настройки карты.
   mapboxToken — публичный токен Mapbox (начинается с pk.). В кабинете Mapbox
   ограничьте его по адресу сайта (URL restrictions), тогда его можно хранить здесь.
-  Пока токена нет, карта работает на бесплатных снимках Esri World Imagery
-  и открытой модели рельефа AWS Terrain Tiles.
+  Если токен пустой, карта работает на бесплатных снимках Esri World Imagery.
+  Рельеф в обоих случаях из открытых AWS Terrain Tiles.
 */
 window.WS_CONFIG = {
   mapboxToken: '',

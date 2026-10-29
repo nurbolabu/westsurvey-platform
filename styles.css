@@ -828,3 +828,7 @@ fieldset.field legend { font-size: 13px; font-weight: 600; margin-bottom: 8px; c
   .route-now div { padding: 8px 10px; }
   .topbar .crumbs { font-size: 12px; }
 }
+@media (min-width: 961px) and (max-width: 1280px) {
+  .map-ui.tl { max-width: min(520px, calc(100% - 32px)); }
+  .map-ui.tr { top: auto; bottom: 150px; right: 60px; flex-direction: column; align-items: flex-end; }
+}
