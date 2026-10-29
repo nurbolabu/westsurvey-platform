@@ -21,9 +21,9 @@
   };
 
   const STATUS = {
-    done: { name: 'Завершено', color: 'var(--st-done)', hex: '#18a06a' },
-    work: { name: 'В работе', color: 'var(--st-work)', hex: '#f5a524' },
-    late: { name: 'Отставание', color: 'var(--st-late)', hex: '#F95D51' },
+    done: { name: 'Завершено', color: 'var(--st-done)', hex: '#1E9E6A' },
+    work: { name: 'В работе', color: 'var(--st-work)', hex: '#F29A0B' },
+    late: { name: 'Отставание', color: 'var(--st-late)', hex: '#E5484D' },
     none: { name: 'Не начато', color: 'var(--st-none)', hex: '#c3c9d5' },
   };
 
@@ -160,7 +160,6 @@
         <aside class="sidebar" id="sidebar">
           <div class="brand"><img src="assets/logo.png" alt="">WESTSURVEY</div>
           <div>
-            <div class="nav-label">Объект</div>
             <nav class="nav">
               <button data-view="overview" ${state.view === 'overview' ? 'aria-current="page"' : ''}>${I.map}Схема трассы</button>
               <button data-view="pickets" ${state.view === 'pickets' ? 'aria-current="page"' : ''}>${I.list}Пикеты</button>
@@ -169,7 +168,7 @@
           </div>
           <div class="side-project">
             <b>${esc(D.project.name)}</b>
-            ${esc(D.project.region)} · ПК 0 – ПК ${D.N} · ${D.project.length} км
+            ${esc(D.project.region)}, ПК 0 – ПК ${D.N}, ${D.project.length} км
           </div>
           <div class="user">
             <div class="avatar">${esc(initials(u.name).toUpperCase())}</div>
@@ -234,7 +233,7 @@
         <div class="kpi accent"><span>Общая готовность</span><b class="num">${pct(t.prog)}</b><div class="bar"><i style="width:${pct(t.prog)}"></i></div></div>
         <div class="kpi"><span>Завершено</span><b class="num">${t.done}</b><small>из ${D.N} пикетов</small></div>
         <div class="kpi"><span>В работе</span><b class="num">${t.work + t.late}</b><small>${t.late} с отставанием</small></div>
-        <div class="kpi"><span>Объём земляных работ</span><b class="num">${num(t.vol / 1000, 1)} тыс.</b><small>м³ из ${num(t.volDesign / 1000, 0)} тыс.</small></div>
+        <div class="kpi"><span>Объём земляных работ</span><b class="num">${num(t.vol / 1000, 0)}<small> тыс. м³</small></b><small>из ${num(t.volDesign / 1000, 0)} тыс. м³ по проекту</small></div>
         <div class="kpi"><span>Техника на объекте</span><b class="num">${t.mach}</b><small>единиц сегодня</small></div>
         <div class="kpi"><span>Рабочие</span><b class="num">${t.workers}</b><small>человек на смене</small></div>
       </div>
@@ -517,7 +516,7 @@
     m.innerHTML = `
       <header class="pk-head">
         <button class="btn ghost sm" data-close>${I.back}<span>К трассе</span></button>
-        <div class="title"><small>${esc(p.contractor.name)}</small><b>${p.label}</b></div>
+        <div class="title"><small>${esc(p.contractor.name)}</small><b>ПК ${p.i}+00 — ПК ${p.i + 1}+00</b></div>
         <span class="pill ${p.status}">${STATUS[p.status].name}</span>
         <div class="spacer"></div>
         <span class="kbd"><kbd>←</kbd> <kbd>→</kbd> соседний пикет · <kbd>Esc</kbd> закрыть</span>
@@ -575,49 +574,69 @@
         const [w, h] = size.split(' ');
         return `<pattern id="pat-${L.id}" width="${w}" height="${h}" patternUnits="userSpaceOnUse">${body}</pattern>`;
       }).join('')}
+      <pattern id="pat-ground" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#e7dccb"/><path d="M0 16 L16 0" stroke="#9b8466" stroke-width="1.2"/><path d="M4 16 L4 12 M12 8 L12 4" stroke="#9b8466" stroke-width="1"/></pattern>
       <pattern id="pat-rest" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#f4f5f8"/><path d="M-2 2l4-4M0 8L8 0M6 10l4-4" stroke="#d9dde6" stroke-width="1"/></pattern>
     </defs></svg>`;
   }
 
   function structHTML(p) {
     const top = [...p.layers].reverse();
-    const pave = top.filter((L) => L.group === 'pave');
-    const earth = top.filter((L) => L.group === 'earth');
-    const H = (arr) => arr.reduce((s, L) => s + L.h, 0);
-    const ringR = 27, C = 2 * Math.PI * ringR;
+    // откосы: полуширина растёт от 50 до 108 по высоте насыпи
+    const W = 260, topHalf = 50, groundH = 30;
+    const slope = 58 / top.reduce((s, L) => s + L.h, 0);
+    let y = 0;
+    const polys = top.map((L) => {
+      const y0 = y, y1 = y + L.h;
+      const h0 = topHalf + slope * y0, h1 = topHalf + slope * y1;
+      const cx = W / 2;
+      y = y1;
+      return { L, y0, y1, xl: cx - h1, xr: cx + h1, ym: (y0 + y1) / 2, rx: cx + (h0 + h1) / 2,
+        pts: `${cx - h0},${y0} ${cx + h0},${y0} ${cx + h1},${y1} ${cx - h1},${y1}` };
+    });
+    const H = y;
+    const paveEnd = polys.filter((x) => x.L.group === 'pave').pop().y1;
+    const done = p.layers.filter((L) => L.frac >= 1).length;
+
+    const shapes = polys.map(({ L, pts, xl, xr, y0, y1, ym, rx }) => {
+      const fx = xl + (xr - xl) * L.frac;
+      return `
+        <g class="xs-layer ${state.layer === L.id ? 'sel' : ''}" data-layer="${L.id}">
+          <clipPath id="clip-${L.id}"><polygon points="${pts}"/></clipPath>
+          <polygon points="${pts}" fill="url(#pat-rest)"/>
+          <rect clip-path="url(#clip-${L.id})" x="${xl}" y="${y0}" width="${Math.max(0, fx - xl)}" height="${y1 - y0}" fill="url(#pat-${L.id})"/>
+          ${L.frac > 0 && L.frac < 1 ? `<line clip-path="url(#clip-${L.id})" x1="${fx}" x2="${fx}" y1="${y0}" y2="${y1}" stroke="var(--work)" stroke-width="3"/>` : ''}
+          <polygon class="xs-outline" points="${pts}" fill="none"/>
+          <line x1="${rx + 4}" x2="${W}" y1="${ym}" y2="${ym}" class="xs-leader"/>
+          <circle cx="${rx + 4}" cy="${ym}" r="2.2" class="xs-dot"/>
+        </g>`;
+    }).join('');
+
     return `
       ${patternDefs()}
-      <section class="card struct-card">
-        <div class="struct-top">
+      <section class="xs-panel">
+        <div class="xs-head">
           <div>
-            <div class="lbl">Готовность конструкции</div>
-            <div class="big num">${Math.round(p.progress * 100)}<small>%</small></div>
-            <div class="lbl">${p.layers.filter((L) => L.frac >= 1).length} из ${p.layers.length} слоёв выполнено</div>
+            <h2>Поперечный профиль</h2>
+            <p>${done} из ${p.layers.length} слоёв выполнено</p>
           </div>
-          <svg class="ring" viewBox="0 0 64 64" aria-hidden="true">
-            <circle cx="32" cy="32" r="${ringR}" fill="none" stroke="#e3e7ef" stroke-width="7"/>
-            <circle cx="32" cy="32" r="${ringR}" fill="none" stroke="#0B41C7" stroke-width="7" stroke-linecap="round"
-              stroke-dasharray="${C * p.progress} ${C}" transform="rotate(-90 32 32)"/>
-          </svg>
+          <div class="xs-pct num">${Math.round(p.progress * 100)}<span>%</span></div>
         </div>
-        <div class="column">
-          <div class="bracket" aria-hidden="true">
-            <div style="top:2px;height:${H(pave) - 2}px"><span>Дорожная одежда</span></div>
-            <div style="top:${H(pave) + 6}px;height:${H(earth) - 4}px"><span>Земляное полотно</span></div>
-          </div>
-          <div class="stack" role="list" aria-label="Слои конструкции">
+        <div class="xs-body">
+          <svg class="xs-svg" viewBox="0 0 ${W} ${H + groundH}" preserveAspectRatio="none" style="height:${H + groundH}px" role="img" aria-label="Поперечный профиль насыпи по слоям">
+            <line x1="0" x2="${W}" y1="${paveEnd}" y2="${paveEnd}" class="xs-split"/>
+            <text class="xs-group" transform="translate(12 ${paveEnd / 2}) rotate(-90)" text-anchor="middle">дорожная одежда</text>
+            <text class="xs-group" transform="translate(12 ${(paveEnd + H) / 2}) rotate(-90)" text-anchor="middle">земляное полотно</text>
+            ${shapes}
+            <rect x="0" y="${H}" width="${W}" height="${groundH}" fill="url(#pat-ground)"/>
+            <line x1="0" x2="${W}" y1="${H}" y2="${H}" stroke="var(--ink)" stroke-width="1.6"/>
+          </svg>
+          <div class="xs-labels">
             ${top.map((L) => `
-              <button class="layer-block ${state.layer === L.id ? 'sel' : ''}" data-layer="${L.id}" style="height:${L.h}px" role="listitem" aria-label="${esc(L.name)}: ${pct(L.frac)}">
-                <svg class="rest" width="100%" height="100%" preserveAspectRatio="none"><rect width="100%" height="100%" fill="url(#pat-rest)"/></svg>
-                <svg class="rest" width="100%" height="100%"><rect width="${L.frac * 100}%" height="100%" fill="url(#pat-${L.id})"/>${L.frac > 0 && L.frac < 1 ? `<line x1="${L.frac * 100}%" x2="${L.frac * 100}%" y1="0" y2="100%" stroke="#0B41C7" stroke-width="2.5"/>` : ''}</svg>
+              <button class="xs-label ${state.layer === L.id ? 'sel' : ''}" data-layer="${L.id}" style="height:${L.h}px">
+                <span class="t"><b>${esc(L.short === 'Основание' ? 'Основание' : L.name.replace('Насыпь, слой', 'Слой'))}</b><span class="num">${num(L.done)} из ${num(L.design)} ${L.unit}</span></span>
+                <span class="p num ${L.frac >= 1 ? 'full' : L.frac <= 0 ? 'zero' : 'part'}">${pct(L.frac)}</span>
               </button>`).join('')}
-          </div>
-          <div class="layer-labels">
-            ${top.map((L) => `
-              <button class="layer-label ${state.layer === L.id ? 'sel' : ''}" data-layer="${L.id}" style="height:${L.h}px">
-                <span class="t"><b>${esc(L.short === 'Основание' ? 'Основание' : L.name.replace('Насыпь, слой', 'Слой'))}</b><span class="num">${num(L.done)} / ${num(L.design)} ${L.unit}</span></span>
-                <span class="p num ${L.frac >= 1 ? 'full' : L.frac <= 0 ? 'zero' : ''}">${pct(L.frac)}</span>
-              </button>`).join('')}
+            <div class="xs-ground" style="height:${groundH}px">Естественный грунт</div>
           </div>
         </div>
         <div class="layer-detail" id="layerDetail">${layerDetailHTML(p)}</div>
@@ -656,71 +675,109 @@
     const daysToNext = daysBetween(D.TODAY, p.nextSurvey);
     const nextTxt = daysToNext < 0 ? `просрочена на ${-daysToNext} ${plural(-daysToNext, 'день', 'дня', 'дней')}` : daysToNext === 0 ? 'сегодня' : `через ${daysToNext} ${plural(daysToNext, 'день', 'дня', 'дней')}`;
     const cur = p.current === -1 ? null : p.stages[p.current];
+    const doneStages = p.stages.filter((s) => s.done).length;
+    const nowTitle = !p.started ? 'Работы не начаты' : cur ? cur.name : 'Работы завершены';
+    const nowNote = !p.started
+      ? `Плановое начало ${date(p.startDate)}`
+      : cur ? `Этап ${p.current + 1} из ${p.stages.length}` : 'Все этапы приняты';
+    const nowCls = !p.started ? 'none' : !cur ? 'done' : p.delayed ? 'late' : 'work';
 
     return `
-      <section class="hero-card">
-        <div class="hero-top">
-          <h1>ПК ${p.i} – ${p.i + 1} <small>(${num(p.km)} км)</small></h1>
-          <div class="spacer"></div>
-          <div class="date-box"><span>Дата начала СМР</span><b>${p.started ? date(p.startDate) : 'план ' + date(p.startDate)}</b></div>
+      <section class="sheet">
+        <div class="sheet-title">
+          <div>
+            <h1 class="chain">ПК ${p.i}<span>+00</span> — ПК ${p.i + 1}<span>+00</span></h1>
+            <p>${num(p.i / 10)}–${num(p.km)} км трассы, участок ${esc(c.name)}</p>
+          </div>
+          <dl class="smr"><dt>${p.started ? 'Начало СМР' : 'Начало СМР по плану'}</dt><dd class="num">${date(p.startDate)}</dd></dl>
         </div>
-        <ol class="stepper" aria-label="Этапы работ">
-          ${p.stages.map((s, k) => `<li class="${s.done ? 'done' : k === p.current ? 'cur' : ''}"><span class="n">${s.done ? I.check : k + 1}</span>${esc(s.name)}</li>`).join('')}
-        </ol>
-        <div class="current-stage">
-          ${cur ? `<span class="muted">Текущий этап:</span><b>${p.current + 1}. ${esc(cur.name)}</b>` : '<b>Все этапы выполнены</b>'}
-          ${p.delayed ? '<span class="pill late">Отставание от графика</span>' : ''}
-        </div>
-      </section>
 
-      <section class="card">
-        <div class="contractor-block">
-          <div style="flex:1;min-width:220px">
-            <div class="muted" style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Подрядная организация</div>
+        <div class="now ${nowCls}">
+          <div class="now-main">
+            <span class="now-label">Текущий статус</span>
+            <strong>${esc(nowTitle)}</strong>
+            <span class="now-note">${nowNote}</span>
+          </div>
+          <div class="now-side">
+            <div class="segbar" aria-hidden="true">${p.stages.map((s, k) => `<i class="${s.done ? 'on' : k === p.current && p.started ? 'cur' : ''}"></i>`).join('')}</div>
+            <span class="num">${doneStages} из ${p.stages.length} этапов</span>
+            ${p.delayed ? '<span class="pill late">Отставание от графика</span>' : ''}
+          </div>
+        </div>
+
+        <div class="sheet-row contractor-row">
+          <div>
+            <span class="cell-label">Подрядная организация</span>
             <h3>${esc(c.name)}</h3>
-            <p>Задействован на ПК ${c.from} – ПК ${c.to} (${num((c.to - c.from) / 10)} км)</p>
+            <p>Задействован на ПК ${c.from} – ПК ${c.to}, ${num((c.to - c.from) / 10)} км</p>
           </div>
           <button class="btn" data-contract>${I.doc}Посмотреть договор</button>
         </div>
-        <div class="people">${c.team.map(personHTML).join('')}${D.SUPERVISION.map(personHTML).join('')}</div>
+        <div class="sheet-row people">${c.team.map(personHTML).join('')}${D.SUPERVISION.map(personHTML).join('')}</div>
+
+        <div class="cells c4">
+          <div class="cell">
+            <span class="cell-label">Техника на пикете</span>
+            <b class="num">${p.machinery.length}</b>
+            ${p.machinery.length ? `<div class="chips">${p.machinery.map((x) => `<span class="chip">${esc(x)}</span>`).join('')}</div>` : `<small>${p.progress >= 1 ? 'Работы завершены' : 'Техника не выставлена'}</small>`}
+          </div>
+          <div class="cell">
+            <span class="cell-label">Рабочая сила</span>
+            <b class="num">${p.workers}</b>
+            <small>${p.workers ? plural(p.workers, 'человек', 'человека', 'человек') + ' на смене' : 'Нет людей на смене'}</small>
+          </div>
+          <div class="cell">
+            <span class="cell-label">Последняя геодезическая съёмка</span>
+            <b class="num">${date(p.lastSurvey)}</b>
+            <small>${p.lastSurvey ? daysBetween(p.lastSurvey, D.TODAY) + ' дн. назад' : 'Съёмок ещё не было'}</small>
+          </div>
+          <div class="cell ${daysToNext < 0 ? 'warn' : ''}">
+            <span class="cell-label">Следующая геодезическая съёмка</span>
+            <b class="num">${date(p.nextSurvey)}</b>
+            <small>${nextTxt}</small>
+          </div>
+        </div>
+
+        <div class="cells c2">
+          <div class="cell">
+            <span class="cell-label">Объём выполненных работ, грунт и щебень</span>
+            <b class="num">${num(p.doneVolume, 1)} м³</b>
+            <small>из ${num(p.designVolume, 1)} м³ по проекту</small>
+            <div class="bar"><i style="width:${pct(p.doneVolume / p.designVolume)}"></i></div>
+          </div>
+          <div class="cell">
+            <span class="cell-label">Покрытие</span>
+            ${['bitumen', 'recycler'].map((id) => {
+              const L = p.layers.find((x) => x.id === id);
+              return `<div class="cover-row"><span>${L.short}</span><b class="num">${num(L.done)} из ${num(L.design)} ${L.unit}</b></div><div class="bar"><i style="width:${pct(L.frac)}"></i></div>`;
+            }).join('')}
+          </div>
+        </div>
       </section>
 
-      <div class="facts">
-        <div class="fact">
-          <span>Техника на пикете</span><b class="num">${p.machinery.length} ${plural(p.machinery.length, 'единица', 'единицы', 'единиц')}</b>
-          ${p.machinery.length ? `<div class="chips">${p.machinery.map((x) => `<span class="chip">${esc(x)}</span>`).join('')}</div>` : `<small>${p.progress >= 1 ? 'работы завершены' : 'работы не начаты'}</small>`}
-        </div>
-        <div class="fact"><span>Рабочая сила</span><b class="num">${p.workers} ${plural(p.workers, 'человек', 'человека', 'человек')}</b><small>на текущей смене</small></div>
-        <div class="fact"><span>Последняя геодезическая съёмка</span><b class="num">${date(p.lastSurvey)}</b><small>${p.lastSurvey ? daysBetween(p.lastSurvey, D.TODAY) + ' дн. назад' : 'съёмок ещё не было'}</small></div>
-        <div class="fact ${daysToNext < 0 ? 'warn' : ''}"><span>Следующая геодезическая съёмка</span><b class="num">${date(p.nextSurvey)}</b><small>${nextTxt}</small></div>
-      </div>
-
-      <div class="facts" style="grid-template-columns:repeat(2,minmax(0,1fr))">
-        <div class="fact"><span>Объём выполненных работ (грунт и щебень)</span><b class="num">${num(p.doneVolume, 1)} м³</b><small>из ${num(p.designVolume, 1)} м³ по проекту</small><div class="bar"><i style="width:${pct(p.doneVolume / p.designVolume)}"></i></div></div>
-        <div class="fact"><span>Покрытие (битум, Recycler)</span>${['bitumen', 'recycler'].map((id) => { const L = p.layers.find((x) => x.id === id); return `<div style="display:flex;justify-content:space-between;gap:8px;margin-top:6px;font-size:13px"><span>${L.short}</span><b class="num" style="font-size:13px;display:inline;margin:0">${num(L.done)} / ${num(L.design)} ${L.unit}</b></div><div class="bar" style="margin-top:4px"><i style="width:${pct(L.frac)}"></i></div>`; }).join('')}</div>
-      </div>
-
-      <div class="cards-3">
-        <section class="card">
-          <div class="card-head"><h3>Геодезия</h3></div>
+      <section class="sheet cells c3">
+        <div class="cell docs">
+          <h3>Геодезия</h3>
           ${docsHTML(p.docsGeo, 'geo')}
-        </section>
-        <section class="card">
-          <div class="card-head"><h3>Лаборатория</h3></div>
+        </div>
+        <div class="cell docs">
+          <h3>Лаборатория</h3>
           ${docsHTML(p.docsLab, 'lab')}
-        </section>
-        <section class="card">
-          <div class="card-head"><h3>Примечание (фото)</h3></div>
-          ${p.note ? `<div class="note ${p.delayed ? '' : 'ok'}">${esc(p.note)}</div>` : ''}
-          ${p.photos.length ? `<div class="photos">${p.photos.map((ph, k) => `<button class="photo" data-photo="${k}" aria-label="${esc(ph.caption)}">${photoSVG(ph, p)}<span>${dateShort(ph.date)}</span></button>`).join('')}</div>` : '<p class="empty">Фотографий пока нет.</p>'}
-        </section>
-      </div>
+        </div>
+        <div class="cell docs">
+          <h3>Примечание и фото</h3>
+          ${p.note ? `<p class="note ${p.delayed ? '' : 'ok'}">${esc(p.note)}</p>` : ''}
+          ${p.photos.length ? `<div class="photos">${p.photos.map((ph, k) => `<button class="photo" data-photo="${k}" aria-label="${esc(ph.caption)}">${photoSVG(ph, p)}<span>${dateShort(ph.date)}</span></button>`).join('')}</div>` : '<p class="empty">Фото появятся после первого выезда на пикет.</p>'}
+        </div>
+      </section>
 
-      <section class="card">
-        <div class="card-head"><h3>Журнал работ</h3><div class="spacer"></div><span class="muted" style="font-size:12.5px">${p.events.length} ${plural(p.events.length, 'запись', 'записи', 'записей')}</span></div>
+      <section class="sheet">
+        <div class="sheet-row log-head"><h3>Журнал работ</h3><span class="muted">${p.events.length} ${plural(p.events.length, 'запись', 'записи', 'записей')}</span></div>
+        <div class="sheet-row">
         ${p.events.length ? `<ol class="timeline">${p.events.map((e) => `
           <li><span class="d num">${date(e.date)}</span><span class="ico ${e.type}">${{ geo: I.pin, work: I.check, progress: I.pin, lab: I.flask, warn: I.alert }[e.type]}</span>
-          <div class="t">${esc(e.text)}<span>${esc(e.who)}</span></div></li>`).join('')}</ol>` : '<p class="empty">Работы на пикете ещё не начинались. Плановая дата начала: ' + date(p.startDate) + '.</p>'}
+          <div class="t">${esc(e.text)}<span>${esc(e.who)}</span></div></li>`).join('')}</ol>` : `<p class="empty">Записей пока нет. Работы на пикете начнутся ${date(p.startDate)}.</p>`}
+        </div>
       </section>`;
   }
 
