@@ -49,6 +49,7 @@
     expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
     down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>',
     upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
+    chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
     menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>',
     phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/></svg>',
   };
@@ -265,49 +266,31 @@
   function renderOverview(main) {
     const t = totals();
     const lag = t.plan - t.prog;
-    const base = prefs.get('base', 'sat');
     const hasLib = WSMap.available();
-    const geo = WSMap.geometry();
+    const opts = [['all', 'Все', null], ['done', 'Завершено', 'done'], ['work', 'В работе', 'work'], ['late', 'Отставание', 'late'], ['none', 'Не начато', 'none']];
     main.innerHTML = `
       <section class="map-hero" id="mapHero">
-        <div class="map-canvas" id="mapCanvas" ${base === 'sat' && hasLib ? '' : 'hidden'}></div>
-        <div class="scheme-layer" ${base === 'scheme' || !hasLib ? '' : 'hidden'}><div class="map-wrap" id="mapWrap"></div></div>
+        <div class="map-canvas" id="mapCanvas" ${hasLib ? '' : 'hidden'}></div>
+        <div class="scheme-layer" ${hasLib ? 'hidden' : ''}><div class="map-wrap" id="mapWrap"></div></div>
 
-        <div class="map-ui tl">
-          <div class="float-card filters-card" id="filtersCard">
-            <div class="fc-head">
-              <div><b>Трасса ПК 0 – ПК ${D.N}</b><span>${esc(geo.name)}, ${num(geo.length / 1000, 1)} км</span></div>
-              <button class="icon-btn sm fc-toggle" id="fcToggle" aria-label="Фильтры" aria-expanded="true">${I.filter}</button>
-            </div>
-            <div class="fc-body">${filterControls()}</div>
+        <div class="map-toolbar" role="toolbar" aria-label="Фильтры карты">
+          <div class="tb-group" role="group" aria-label="Этап работ">
+            ${opts.map(([id, name, st]) => `<button class="tb-btn" data-filter="${id}" aria-pressed="${state.filter === id}">${st ? `<span class="dot" style="background:${STATUS[st].color}"></span>` : ''}${name}</button>`).join('')}
           </div>
+          <label class="tb-btn tb-select">
+            <span class="sr">Подрядчик</span>
+            <select id="contrSel" aria-label="Подрядчик">
+              <option value="all">Все подрядчики</option>
+              ${D.CONTRACTORS.map((c) => `<option value="${c.id}" ${state.contractor === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}
+            </select>
+            ${I.chevron}
+          </label>
+          ${hasLib ? `
+          <button class="tb-btn tb-toggle" id="terrainBtn" aria-pressed="false">${I.mountain}3D рельеф<i class="sw" aria-hidden="true"></i></button>
+          <button class="tb-btn" id="fitBtn">${I.expand}Вся трасса</button>` : ''}
         </div>
 
-        <div class="map-ui tr">
-          <div class="seg glass" role="group" aria-label="Подложка">
-            <button data-base="sat" aria-pressed="${base === 'sat'}" ${hasLib ? '' : 'disabled'}>Спутник</button>
-            <button data-base="scheme" aria-pressed="${base === 'scheme' || !hasLib}">Схема</button>
-          </div>
-          <button class="btn glass sm" id="terrainBtn" aria-pressed="false" ${base === 'sat' && hasLib ? '' : 'hidden'}>${I.mountain}3D рельеф</button>
-          <button class="btn glass sm" id="fitBtn" ${base === 'sat' && hasLib ? '' : 'hidden'}>${I.expand}Вся трасса</button>
-        </div>
-
-        <div class="map-ui bl">
-          <div class="float-card legend-card">
-            ${Object.entries(STATUS).map(([, s]) => `<span><i class="dot" style="background:${s.color}"></i>${s.name}</span>`).join('')}
-          </div>
-        </div>
-
-        <div class="map-ui br-progress">
-          <div class="float-card progress-card">
-            <span>Общая готовность</span>
-            <b class="num">${pctD(t.prog)}</b>
-            <div class="bar plan"><i style="width:${pct(t.prog)}"></i><em style="left:${pct(t.plan)}"></em></div>
-            <small>План ${pctD(t.plan)}${lag > 0.002 ? `, отставание ${pctD(lag)}` : ''}</small>
-          </div>
-        </div>
-
-        <button class="scroll-cue" id="scrollCue">${I.down}Показатели и график</button>
+        <button class="scroll-cue" id="scrollCue">Показатели и график${I.down}</button>
       </section>
 
       <div class="below" id="below">
@@ -343,30 +326,22 @@
     drawMap();
     drawRibbon();
 
-    if (base === 'sat' && hasLib) {
+    if (hasLib) {
       mapCtl = WSMap.mount($('#mapCanvas'), {
         color: (p) => STATUS[p.status].hex,
         matches,
-        padding: window.innerWidth < 700 ? { top: 150, bottom: 150, left: 40, right: 40 } : { top: 180, bottom: 150, left: 110, right: 290 },
+        padding: window.innerWidth < 700 ? { top: 130, bottom: 110, left: 40, right: 40 } : { top: 120, bottom: 120, left: 100, right: 100 },
         onHover: (e, i) => showTip(e, D.pickets[i]),
         onLeave: hideTip,
         onPick: (i) => { hideTip(); go(state.view, i); },
       });
+      $('#terrainBtn').addEventListener('click', (e) => {
+        const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+        e.currentTarget.setAttribute('aria-pressed', on);
+        mapCtl && mapCtl.terrain(on);
+      });
+      $('#fitBtn').addEventListener('click', () => mapCtl && mapCtl.fit());
     }
-
-    $$('[data-base]').forEach((b) => b.addEventListener('click', () => { prefs.set('base', b.dataset.base); renderApp(); }));
-    $('#terrainBtn').addEventListener('click', (e) => {
-      const on = e.currentTarget.getAttribute('aria-pressed') !== 'true';
-      e.currentTarget.setAttribute('aria-pressed', on);
-      mapCtl && mapCtl.terrain(on);
-    });
-    $('#fitBtn').addEventListener('click', () => mapCtl && mapCtl.fit());
-    $('#fcToggle').addEventListener('click', (e) => {
-      const card = $('#filtersCard');
-      card.classList.toggle('collapsed');
-      e.currentTarget.setAttribute('aria-expanded', !card.classList.contains('collapsed'));
-    });
-    if (window.innerWidth < 700) $('#filtersCard').classList.add('collapsed');
     $('#scrollCue').addEventListener('click', () => $('#below').scrollIntoView({ behavior: 'smooth' }));
   }
 
