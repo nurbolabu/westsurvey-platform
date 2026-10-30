@@ -51,9 +51,10 @@
   function geometry() {
     const D = window.DATA, cfg = window.WS_CONFIG;
     const imported = window.WS.Store.route();
-    let coords = imported ? imported.coords : smooth(cfg.demoRoute);
+    const project = cfg.projectRoute;
+    let coords = imported ? imported.coords : project ? project.coords : smooth(cfg.demoRoute);
     let cum = measure(coords);
-    if (!imported) {
+    if (!imported && !project) {
       // демо-линию обрезаем ровно по последнему пикету
       const want0 = D.N * cfg.picketStep;
       const cut = cum.findIndex((d) => d >= want0);
@@ -63,6 +64,7 @@
     const want = D.N * cfg.picketStep;
     // если длина загруженной оси сильно отличается от числа пикетов, растягиваем шаг
     const step = !imported && length >= want ? cfg.picketStep : Math.abs(length - want) / want < 0.05 ? cfg.picketStep : length / D.N;
+    const src = imported || project;
     const pos = [], segs = [];
     for (let i = 0; i <= D.N; i++) pos.push(pointAt(coords, cum, i * step));
     for (let i = 0; i < D.N; i++) {
@@ -70,7 +72,7 @@
       for (let k = 0; k <= 4; k++) s.push(pointAt(coords, cum, (i + k / 4) * step));
       segs.push(s);
     }
-    return { coords, length, step, pos, segs, imported: !!imported, name: imported ? imported.name : 'Демо-трасса' };
+    return { coords, length, step, pos, segs, imported: !!imported, edges: (src && src.edges) || [], vertices: (src && src.vertices) || [], name: imported ? imported.name : project ? project.name : 'Демо-трасса' };
   }
 
   function styleFor(token) {
@@ -122,6 +124,10 @@
         return { type: 'Feature', id: i, properties: { i, color: opts.color(p), on: opts.matches(p) ? 1 : 0 }, geometry: { type: 'LineString', coordinates: s } };
       }),
     });
+    const edgeData = () => ({
+      type: 'FeatureCollection',
+      features: geo.edges.map((c) => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: c } })),
+    });
     const pointData = () => ({
       type: 'FeatureCollection',
       features: geo.pos.filter((_, i) => i % 10 === 0).map((c, k) => ({ type: 'Feature', properties: { pk: k * 10, major: (k * 10) % 50 === 0 ? 1 : 0 }, geometry: { type: 'Point', coordinates: c } })),
@@ -133,7 +139,7 @@
       geo.pos.forEach((c, i) => {
         if (i % 10) return;
         const elm = document.createElement('div');
-        elm.className = 'pk-tag' + (i % 50 === 0 ? ' major' : '');
+        elm.className = 'pk-tag' + (i % 50 === 0 ? ' major' : '') + (i % 100 === 0 ? ' km10' : '');
         elm.textContent = `ПК ${i}`;
         markers.push(new lib.Marker({ element: elm, anchor: 'bottom', offset: [0, -8] }).setLngLat(c).addTo(map));
       });
@@ -145,15 +151,17 @@
       });
       zoomClass();
     }
-    function zoomClass() { el.classList.toggle('zoom-far', map.getZoom() < 11.2); }
+    function zoomClass() { const z = map.getZoom(); el.classList.toggle('zoom-far', z < 12); el.classList.toggle('zoom-very-far', z < 10.6); }
 
     map.on('load', () => {
+      map.addSource('edges', { type: 'geojson', data: edgeData() });
+      map.addLayer({ id: 'edges', type: 'line', source: 'edges', minzoom: 13, paint: { 'line-color': '#ffffff', 'line-opacity': ['interpolate', ['linear'], ['zoom'], 13, 0, 14.5, 0.75], 'line-width': 1 } });
       map.addSource('segs', { type: 'geojson', data: segData() });
       map.addSource('pts', { type: 'geojson', data: pointData() });
-      map.addLayer({ id: 'route-casing', type: 'line', source: 'segs', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 9, 6, 14, 16] } });
+      map.addLayer({ id: 'route-casing', type: 'line', source: 'segs', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 8, 7, 12, 10, 15, 16] } });
       map.addLayer({ id: 'route', type: 'line', source: 'segs', layout: { 'line-cap': 'butt', 'line-join': 'round' }, paint: {
         'line-color': ['get', 'color'],
-        'line-width': ['interpolate', ['linear'], ['zoom'], 9, 3.5, 14, 11],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 8, 4.5, 12, 6.5, 15, 11],
         'line-opacity': ['case', ['==', ['get', 'on'], 1], 1, 0.25],
       } });
       map.addLayer({ id: 'route-hover', type: 'line', source: 'segs', filter: ['==', ['get', 'i'], -1], paint: { 'line-color': '#0B41C7', 'line-width': ['interpolate', ['linear'], ['zoom'], 9, 8, 14, 20], 'line-opacity': 0.55 } });
@@ -161,6 +169,9 @@
       map.addLayer({ id: 'pk-dots', type: 'circle', source: 'pts', paint: {
         'circle-radius': ['case', ['==', ['get', 'major'], 1], 6, 4],
         'circle-color': '#fff', 'circle-stroke-color': '#1B2230', 'circle-stroke-width': 2,
+        // на общем виде только каждый 50-й пикет, ближе все через 10
+        'circle-opacity': ['step', ['zoom'], ['case', ['==', ['get', 'major'], 1], 1, 0], 12, 1],
+        'circle-stroke-opacity': ['step', ['zoom'], ['case', ['==', ['get', 'major'], 1], 1, 0], 12, 1],
       } });
       placeMarkers();
       el.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');
@@ -190,6 +201,7 @@
         if (!map.getSource('segs')) return;
         map.getSource('segs').setData(segData());
         map.getSource('pts').setData(pointData());
+        map.getSource('edges').setData(edgeData());
         placeMarkers();
         this.fit();
       },
@@ -223,17 +235,27 @@
       xml.querySelectorAll('LineString coordinates').forEach((n) => lines.push(parseCoords(n.textContent)));
       xml.querySelectorAll('Placemark').forEach((pm) => {
         const c = pm.querySelector('Point coordinates');
-        if (c) points.push({ name: (pm.querySelector('name') || {}).textContent || '', coord: parseCoords(c.textContent)[0] });
+        if (c) points.push({ name: ((pm.querySelector('name') || {}).textContent || '').trim(), coord: parseCoords(c.textContent)[0] });
       });
     }
     lines = lines.filter((l) => l.length >= 2);
     if (!lines.length) throw new Error('В файле нет линии оси трассы (LineString). Экспортируйте ось как полилинию.');
-    // берём самую длинную линию как ось
-    const coords = lines.map((l) => ({ l, len: measure(l).pop() })).sort((a, b) => b.len - a.len)[0].l;
-    const bad = coords.some(([x, y]) => Math.abs(x) > 180 || Math.abs(y) > 90);
-    if (bad) throw new Error('Координаты не в WGS84 (долгота/широта). Перепроецируйте чертёж в EPSG:4326 перед экспортом.');
-    const pickets = points.filter((p) => /пк|pk/i.test(p.name));
-    return { name, coords, length: measure(coords).pop(), lines: lines.length, pickets: pickets.length, importedAt: new Date().toISOString() };
+    if (lines.some((l) => l.some(([x, y]) => Math.abs(x) > 180 || Math.abs(y) > 90))) throw new Error('Координаты не в WGS84 (долгота/широта). Перепроецируйте чертёж в EPSG:4326 перед экспортом.');
+    // отбрасываем объекты, которые при привязке улетели далеко от основной части чертежа
+    const pkPts = points.filter((p) => /пк|pk/i.test(p.name) && p.coord);
+    const ref = pkPts.length ? pkPts : lines.map((l) => ({ coord: l[0] }));
+    const med = (arr) => arr.slice().sort((a, b) => a - b)[Math.floor(arr.length / 2)];
+    const center = [med(ref.map((p) => p.coord[0])), med(ref.map((p) => p.coord[1]))];
+    const near = lines.filter((l) => dist(l[Math.floor(l.length / 2)], center) < 150000);
+    const dropped = lines.length - near.length;
+    // ось: среди самых длинных параллельных линий (ось и кромки) берём среднюю
+    const withLen = near.map((l) => ({ l, len: measure(l).pop() })).sort((a, b) => b.len - a.len);
+    const top = withLen.filter((x) => x.len >= withLen[0].len * 0.98 && dist(x.l[0], withLen[0].l[0]) < 60);
+    const order = top.map((x) => ({ ...x, side: (x.l[0][0] - withLen[0].l[0][0]) + (x.l[0][1] - withLen[0].l[0][1]) })).sort((a, b) => a.side - b.side);
+    const axis = order[Math.floor((order.length - 1) / 2)];
+    const edges = order.filter((x) => x !== axis).map((x) => x.l.filter((_, i) => i % 4 === 0 || i === x.l.length - 1));
+    const vertices = points.filter((p) => /^ВУ\s*\d+/i.test(p.name)).map((p) => ({ name: p.name, coord: p.coord }));
+    return { name, coords: axis.l, edges, vertices, length: axis.len, lines: lines.length, dropped, parallels: order.length, pickets: pkPts.length, importedAt: new Date().toISOString() };
   }
 
   window.WSMap = { mount, geometry, parseRouteFile, available: () => !!window.maplibregl };

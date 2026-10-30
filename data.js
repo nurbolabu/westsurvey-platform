@@ -8,7 +8,10 @@
   const TODAY = new Date('2026-10-29');
   const addDays = (d, n) => new Date(d.getTime() + n * 86400000);
 
-  const N = 200; // пикетов по 100 м → 20 км
+  // Число пикетов берётся из оси трассы (config.js); демо-объёмы и участки масштабируются под него
+  const N = (window.WS_CONFIG && window.WS_CONFIG.picketCount) || 200;
+  const SC = N / 200;
+  const at = (pk) => Math.round(pk * SC);
 
   // Конструкция: снизу вверх (как на эскизе)
   const LAYERS = [
@@ -41,9 +44,9 @@
 
   const CONTRACTORS = [
     {
-      id: 'akzh', name: 'ТОО «Актобе Жол Курылыс»', short: 'Актобе Жол', from: 0, to: 65, color: '#0B41C7',
+      id: 'akzh', name: 'ТОО «Атырау Жол Құрылыс»', short: 'Атырау Жол', from: 0, to: at(65), color: '#0B41C7',
       start: '2026-08-17',
-      contract: { no: '№ 07/26-СМР', date: '2026-03-02', sum: '3 940 000 000 ₸', until: '2027-08-31', subject: 'Строительство земляного полотна и дорожной одежды, ПК 0 – ПК 65' },
+      contract: { no: '№ 07/26-СМР', date: '2026-03-02', sum: '3 940 000 000 ₸', until: '2027-08-31', subject: '' },
       team: [
         { name: 'Ержан Сарсенов', role: 'Руководитель проекта', phone: '+7 701 000 11 22' },
         { name: 'Айдос Кенжебаев', role: 'Прораб участка', phone: '+7 702 000 33 44' },
@@ -51,9 +54,9 @@
       ],
     },
     {
-      id: 'zak', name: 'ТОО «ЗАК ТРАНС»', short: 'ЗАК ТРАНС', from: 65, to: 120, color: '#3BA9F5',
+      id: 'zak', name: 'ТОО «ЗАК ТРАНС»', short: 'ЗАК ТРАНС', from: at(65), to: at(120), color: '#3BA9F5',
       start: '2026-09-07',
-      contract: { no: '№ 12/26-СМР', date: '2026-04-15', sum: '3 310 000 000 ₸', until: '2027-09-30', subject: 'Строительство земляного полотна и дорожной одежды, ПК 65 – ПК 120' },
+      contract: { no: '№ 12/26-СМР', date: '2026-04-15', sum: '3 310 000 000 ₸', until: '2027-09-30', subject: '' },
       team: [
         { name: 'Нурлан Абдрахманов', role: 'Руководитель проекта', phone: '+7 701 000 77 88' },
         { name: 'Серик Тулегенов', role: 'Прораб участка', phone: '+7 707 000 99 10' },
@@ -61,9 +64,9 @@
       ],
     },
     {
-      id: 'btk', name: 'ТОО «Батыс Транс Құрылыс»', short: 'Батыс Транс', from: 120, to: 200, color: '#FF8562',
+      id: 'btk', name: 'ТОО «Батыс Транс Құрылыс»', short: 'Батыс Транс', from: at(120), to: N, color: '#FF8562',
       start: '2026-10-05',
-      contract: { no: '№ 19/26-СМР', date: '2026-06-10', sum: '4 760 000 000 ₸', until: '2027-11-30', subject: 'Строительство земляного полотна и дорожной одежды, ПК 120 – ПК 200' },
+      contract: { no: '№ 19/26-СМР', date: '2026-06-10', sum: '4 760 000 000 ₸', until: '2027-11-30', subject: '' },
       team: [
         { name: 'Бауыржан Утепов', role: 'Руководитель проекта', phone: '+7 701 000 14 15' },
         { name: 'Руслан Есенгалиев', role: 'Прораб участка', phone: '+7 775 000 16 17' },
@@ -71,6 +74,8 @@
       ],
     },
   ];
+
+  CONTRACTORS.forEach((c) => { c.contract.subject = `Строительство земляного полотна и дорожной одежды, ПК ${c.from} – ПК ${c.to}`; });
 
   const SUPERVISION = [
     { name: 'Арман Жаксылыков', role: 'Старший геодезист · WestSurvey', phone: '+7 700 000 20 21' },
@@ -83,7 +88,8 @@
   const profileAt = (i) => {
     for (let k = 0; k < PROFILE.length - 1; k++) {
       const [a, va] = PROFILE[k], [b, vb] = PROFILE[k + 1];
-      if (i >= a && i <= b) return va + ((vb - va) * (i - a)) / (b - a);
+      const x = i / SC;
+      if (x >= a && x <= b) return va + ((vb - va) * (x - a)) / (b - a);
     }
     return 0;
   };
@@ -119,17 +125,17 @@
     });
     const current = stages.findIndex((s) => !s.done);
 
-    const startDate = addDays(new Date(c.start), Math.round((i - c.from) * 0.9 + rnd() * 4));
+    const startDate = addDays(new Date(c.start), Math.round(((i - c.from) * 0.9) / SC + rnd() * 4));
     const started = p > 0;
     const lastSurvey = started ? addDays(TODAY, -Math.ceil(rnd() * 13)) : null;
-    const nextSurvey = started ? addDays(lastSurvey, 14) : addDays(new Date(c.start), Math.round((i - c.from) * 0.9) + 7);
+    const nextSurvey = started ? addDays(lastSurvey, 14) : addDays(new Date(c.start), Math.round(((i - c.from) * 0.9) / SC) + 7);
 
     const inWork = p > 0 && p < 1;
     const delayed = inWork && noise < -0.016;
     const status = p === 1 ? 'done' : delayed ? 'late' : inWork ? 'work' : 'none';
 
     // техника и люди сегодня стоят только на активных фронтах работ
-    const active = inWork && (i === 100 || rnd() < 0.12);
+    const active = inWork && (i === 100 || rnd() < 0.12 / SC * 1.5);
     const nMach = active ? 2 + Math.floor(rnd() * 5) : 0;
     const machinery = [];
     const pool = [...MACHINES];
@@ -221,9 +227,9 @@
     pickets: generate(),
     generate, recompute,
     project: {
-      name: 'Строительство автомобильной дороги',
-      region: 'Актюбинская область',
-      length: 20,
+      name: 'Автодорога Асан – Азгир – Балкудык',
+      region: 'Атырауская область',
+      length: Math.round(N / 10),
       customer: 'Заказчик (демо)',
     },
   };

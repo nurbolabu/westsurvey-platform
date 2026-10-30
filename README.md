@@ -1,6 +1,6 @@
 # WestSurvey · контроль строительства автодороги
 
-Платформа WestSurvey и Kazcomservice для контроля хода строительства автодороги в Актюбинской области.
+Платформа WestSurvey и Kazcomservice для контроля хода строительства автодороги Асан – Азгир – Балкудык (62 км) в Атырауской области.
 
 Демо: https://nurbolabu.github.io/westsurvey-platform/
 
@@ -16,7 +16,8 @@
 | Файл | Назначение |
 |---|---|
 | `index.html`, `styles.css`, `app.js` | интерфейс |
-| `config.js` | токен Mapbox и демо-трасса |
+| `config.js` | токен Mapbox, число пикетов, запасная демо-трасса |
+| `data/route-asan.js` | ось трассы, 6 кромок и вершины углов из «Проект Атырау.kml» (WGS84, 62,02 км) |
 | `map.js` | карта (MapLibre GL, тайлы Mapbox или Esri), разбор KML/GeoJSON |
 | `data.js` | демо-данные проекта |
 | `entries.js` | хранилище внесённых данных (сейчас браузер, далее Supabase) |

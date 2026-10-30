@@ -1028,3 +1028,4 @@ fieldset.field legend { font-size: 13px; font-weight: 600; margin-bottom: 8px; c
 .logo-plate .logo-sep { height: 30px; }
 @media (max-width: 960px) { .logo-plate { padding: 7px 14px; gap: 12px; } .logo-plate img { height: 34px; } .logo-plate .logo-sep { height: 24px; } }
 .auth-panel { justify-content: center; padding-top: 40px; }
+.zoom-very-far .pk-tag:not(.km10) { display: none; }

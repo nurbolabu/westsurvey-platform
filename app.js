@@ -1017,7 +1017,9 @@
                 <dt>Файл</dt><dd>${esc(fl.name)}</dd>
                 <dt>Длина оси</dt><dd>${num(parsed.length / 1000, 2)} км</dd>
                 <dt>Точек оси</dt><dd>${parsed.coords.length}</dd>
+                <dt>Кромок рядом с осью</dt><dd>${parsed.edges.length || 'нет'}</dd>
                 <dt>Точек «ПК» в файле</dt><dd>${parsed.pickets || 'нет'}</dd>
+                ${parsed.dropped ? `<dt>Отброшено объектов вне трассы</dt><dd>${parsed.dropped}</dd>` : ''}
                 <dt>Пикетов по 100 м</dt><dd>${Math.floor(parsed.length / 100)}</dd>
               </dl>
               <button class="btn" id="routeApply" type="button">Показать эту трассу на карте</button>
