@@ -623,7 +623,7 @@
     const layerStats = D.LAYERS.map((L, k) => {
       const done = list.reduce((s, p) => s + p.layers[k].done, 0);
       const design = list.reduce((s, p) => s + p.layers[k].design, 0);
-      const started = list.filter((p) => p.layers[k].frac > 0).length;
+      const started = list.filter((p) => p.layers[k].frac > 0 || p.layers[k].active).length;
       return { L, k, done, design, frac: design ? done / design : 0, started };
     });
     const active = layerStats.filter((s) => s.started > 0 && s.frac < 1);
@@ -641,8 +641,9 @@
       const cw = 1000 / N;
       return D.pickets.map((p) => {
         const f = p.layers[k].frac;
-        if (f <= 0) return '';
         const on = matches(p);
+        if (f <= 0 && p.layers[k].active) return `<rect x="${p.i * cw}" y="0" width="${cw + 0.3}" height="100" fill="#F29A0B" opacity="${on ? 0.85 : 0.18}"/>`;
+        if (f <= 0) return '';
         return `<rect x="${p.i * cw}" y="0" width="${cw + 0.3}" height="100" fill="${mix('#9DB7F2', '#0B41C7', f)}" opacity="${on ? 1 : 0.18}"/>`;
       }).join('');
     };
@@ -1285,8 +1286,8 @@
           <div class="xs-labels">
             ${top.map((L) => `
               <button class="xs-label ${state.layer === L.id ? 'sel' : ''}" data-layer="${L.id}" style="height:${L.h}px">
-                <span class="t"><b>${esc(L.short === 'Основание' ? 'Основание' : L.name.replace('Насыпь, слой', 'Слой'))}</b><span class="num">${L.frac > 0 ? `${num(L.done)} из ${num(L.design)} ${L.unit}` : `по графику с ${date(new Date(L.planStart))}`}</span></span>
-                <span class="p num ${L.frac >= 1 ? 'full' : L.frac <= 0 ? 'zero' : 'part'}">${pct(L.frac)}</span>
+                <span class="t"><b>${esc(L.short === 'Основание' ? 'Основание' : L.name.replace('Насыпь, слой', 'Слой'))}</b><span class="num">${L.frac > 0 ? `${num(L.done)} из ${num(L.design)} ${L.unit}` : L.active ? 'в работе, объём не внесён' : `по графику с ${date(new Date(L.planStart))}`}</span></span>
+                <span class="p num ${L.frac >= 1 ? 'full' : L.frac <= 0 && !L.active ? 'zero' : 'part'}">${L.frac <= 0 && L.active ? '—' : pct(L.frac)}</span>
               </button>`).join('')}
             <div class="xs-ground" style="height:${groundH}px">Естественный грунт</div>
           </div>
@@ -1300,7 +1301,7 @@
     const k = p.layers.indexOf(L);
     const ev = p.events.find((e) => e.text.startsWith(L.name));
     const lab = L.group === 'earth' && L.frac >= 1 ? p.events.find((e) => e.type === 'lab') : null;
-    const statusTxt = L.frac >= 1 ? 'Выполнен' : L.frac > 0 ? 'В работе' : k > 0 && p.layers[k - 1].frac < 1 ? 'Ожидает нижний слой' : 'Не начат';
+    const statusTxt = L.frac >= 1 ? 'Выполнен' : L.frac > 0 || L.active ? 'В работе' : k > 0 && p.layers[k - 1].frac < 1 ? 'Ожидает нижний слой' : 'Не начат';
     return `
       <h4>${esc(L.name)}</h4>
       <dl class="kv">
@@ -1462,8 +1463,8 @@
         <dl class="kv">
           <dt>Подрядчик</dt><dd>${esc(c.name)}</dd>
           <dt>Предмет</dt><dd>${esc(k.subject)}</dd>
-          <dt>Дата договора</dt><dd>${date(new Date(k.date))}</dd>
-          <dt>Срок окончания</dt><dd>${date(new Date(k.until))}</dd>
+          <dt>Дата договора</dt><dd>${k.date ? date(new Date(k.date)) : '—'}</dd>
+          <dt>Срок окончания</dt><dd>${k.until ? date(new Date(k.until)) : '—'}</dd>
           <dt>Сумма</dt><dd>${esc(k.sum)}</dd>
           <dt>Участок</dt><dd>ПК ${c.from} – ПК ${c.to} (${num((c.to - c.from) / 10)} км)</dd>
         </dl>

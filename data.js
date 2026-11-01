@@ -5,7 +5,7 @@
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-  const TODAY = new Date('2026-10-29');
+  const TODAY = new Date('2026-11-02');
   const addDays = (d, n) => new Date(d.getTime() + n * 86400000);
 
   // Число пикетов берётся из оси трассы (config.js); демо-объёмы и участки масштабируются под него
@@ -42,45 +42,21 @@
 
   const MACHINES = ['Самосвал', 'Каток', 'Экскаватор', 'Погрузчик', 'Автогрейдер', 'Бульдозер', 'Автогудронатор', 'Рециклер'];
 
+  // Фактические данные объекта на 02.11.2026 (участки подрядчиков и выполненные работы)
+  const mk = (id, name, short, from, to, color) => ({ id, name, short, from, to, color, start: '2026-11-02',
+    contract: { no: 'не внесён', date: null, sum: '—', until: null, subject: '' }, team: [] });
   const CONTRACTORS = [
-    {
-      id: 'akzh', name: 'ТОО «Атырау Жол Құрылыс»', short: 'Атырау Жол', from: 0, to: at(65), color: '#0B41C7',
-      start: '2026-08-17',
-      contract: { no: '№ 07/26-СМР', date: '2026-03-02', sum: '3 940 000 000 ₸', until: '2027-08-31', subject: '' },
-      team: [
-        { name: 'Ержан Сарсенов', role: 'Руководитель проекта', phone: '+7 701 000 11 22' },
-        { name: 'Айдос Кенжебаев', role: 'Прораб участка', phone: '+7 702 000 33 44' },
-        { name: 'Мадина Жумагулова', role: 'Инженер ПТО', phone: '+7 705 000 55 66' },
-      ],
-    },
-    {
-      id: 'zak', name: 'ТОО «ЗАК ТРАНС»', short: 'ЗАК ТРАНС', from: at(65), to: at(120), color: '#3BA9F5',
-      start: '2026-09-07',
-      contract: { no: '№ 12/26-СМР', date: '2026-04-15', sum: '3 310 000 000 ₸', until: '2027-09-30', subject: '' },
-      team: [
-        { name: 'Нурлан Абдрахманов', role: 'Руководитель проекта', phone: '+7 701 000 77 88' },
-        { name: 'Серик Тулегенов', role: 'Прораб участка', phone: '+7 707 000 99 10' },
-        { name: 'Алия Бекмуханова', role: 'Инженер ПТО', phone: '+7 708 000 12 13' },
-      ],
-    },
-    {
-      id: 'btk', name: 'ТОО «Батыс Транс Құрылыс»', short: 'Батыс Транс', from: at(120), to: N, color: '#FF8562',
-      start: '2026-10-05',
-      contract: { no: '№ 19/26-СМР', date: '2026-06-10', sum: '4 760 000 000 ₸', until: '2027-11-30', subject: '' },
-      team: [
-        { name: 'Бауыржан Утепов', role: 'Руководитель проекта', phone: '+7 701 000 14 15' },
-        { name: 'Руслан Есенгалиев', role: 'Прораб участка', phone: '+7 775 000 16 17' },
-        { name: 'Динара Касымова', role: 'Инженер ПТО', phone: '+7 776 000 18 19' },
-      ],
-    },
+    mk('zak', 'ТОО «ЗАК ТРАНС»', 'ЗАК ТРАНС', 0, 110, '#0B41C7'),
+    mk('eko', 'ТОО «ЭКО ПЛАСТ»', 'ЭКО ПЛАСТ', 110, 210, '#3BA9F5'),
+    mk('tbd', 'Подрядчик не определён', 'Не определён', 210, 310, '#9AA3B2'),
+    mk('arm', 'ТОО «Армандастар»', 'Армандастар', 310, N, '#FF8562'),
   ];
+  CONTRACTORS.forEach((c) => { c.section = c.from < 310 ? 1 : 2; });
+  // Геодезическая разбивка и работы: [ПК от, ПК до), ПК до не включительно
+  const STAKEOUT = [[50, 78], [190, 210], [218, 248], [352, N]];
+  const WORKS = [{ layer: 's1', from: 390, to: 550, text: 'Отсыпка первого слоя' }];
 
-  CONTRACTORS.forEach((c) => { c.contract.subject = `Строительство земляного полотна и дорожной одежды, ПК ${c.from} – ПК ${c.to}`; });
-
-  const SUPERVISION = [
-    { name: 'Арман Жаксылыков', role: 'Старший геодезист · WestSurvey', phone: '+7 700 000 20 21' },
-    { name: 'Асель Нурпеисова', role: 'Технический надзор', phone: '+7 700 000 22 23' },
-  ];
+  const SUPERVISION = [];
 
   // Профиль готовности вдоль трассы: [ПК, готовность]
   // Начало строительства: в среднем ~10%, идут только основание и слой I насыпи
@@ -97,104 +73,29 @@
   const fmtFile = (pk, s) => s.replace('{pk}', pk);
 
   function generate() {
-  seed = 20261029;
   const pickets = [];
-  let noise = 0;
   for (let i = 0; i < N; i++) {
-    noise = noise * 0.7 + (rnd() - 0.5) * 0.05;
-    const c = CONTRACTORS.find((x) => i >= x.from && i < x.to);
-    let p = clamp(profileAt(i) + noise, 0, 1);
-    if (p > 0.97) p = 1;
-    if (p < 0.012) p = 0;
-
-    const x = p * LAYERS.length;
-    const layers = LAYERS.map((L, k) => {
-      const design = +(L.design * (0.88 + rnd() * 0.24)).toFixed(1);
-      const frac = clamp(x - k, 0, 1);
-      return { ...L, design, done: +(design * frac).toFixed(1), frac };
-    });
-
-    // этапы
-    const postDone = p === 1 ? (i < 40 ? 2 : i < 60 ? 1 : 0) : 0;
-    const stages = STAGES.map((name, s) => {
-      let done = p >= STAGE_AT[s] && STAGE_AT[s] < 1;
-      if (s === 6) done = p === 1;
-      if (s === 7) done = postDone >= 1;
-      if (s === 8) done = postDone >= 2;
-      return { name, done };
-    });
-    const current = stages.findIndex((s) => !s.done);
-
-    const startDate = addDays(new Date(c.start), Math.round(((i - c.from) * 0.9) / SC + rnd() * 4));
-    const started = p > 0;
-    const lastSurvey = started ? addDays(TODAY, -Math.ceil(rnd() * 13)) : null;
-    const nextSurvey = started ? addDays(lastSurvey, 14) : addDays(new Date(c.start), Math.round(((i - c.from) * 0.9) / SC) + 7);
-
-    const inWork = p > 0 && p < 1;
-    const delayed = inWork && noise < -0.016;
-    const status = p === 1 ? 'done' : delayed ? 'late' : inWork ? 'work' : 'none';
-
-    // техника и люди сегодня стоят только на активных фронтах работ
-    const active = inWork && (i === 100 || rnd() < 0.12 / SC * 1.5);
-    const nMach = active ? 2 + Math.floor(rnd() * 5) : 0;
-    const machinery = [];
-    const pool = [...MACHINES];
-    for (let m = 0; m < nMach; m++) machinery.push(pool.splice(Math.floor(rnd() * pool.length), 1)[0]);
-    const workers = active ? 6 + Math.floor(rnd() * 18) : 0;
-
-    // журнал работ
+    const c = CONTRACTORS.find((x) => i >= x.from && i < x.to) || CONTRACTORS[CONTRACTORS.length - 1];
+    // проектные объёмы пока типовые, до загрузки ведомости объёмов
+    const layers = LAYERS.map((L) => ({ ...L, design: L.design, done: 0, frac: 0, active: false }));
+    const staked = STAKEOUT.some(([a, b]) => i >= a && i < b);
+    const works = WORKS.filter((w) => i >= w.from && i < w.to);
+    works.forEach((w) => { const L = layers.find((x) => x.id === w.layer); if (L) L.active = true; });
+    const started = staked || works.length > 0;
+    const stages = STAGES.map((name, k) => ({ name, done: k === 0 && staked }));
+    const current = works.length ? 1 : staked ? 1 : 0;
     const events = [];
-    if (started) {
-      const span = Math.max(5, (TODAY - startDate) / 86400000 - 2);
-      events.push({ date: startDate, type: 'geo', text: 'Геодезическая разбивка оси и границ земляного полотна', who: 'WestSurvey' });
-      layers.forEach((L, k) => {
-        if (L.frac <= 0) return;
-        const d = addDays(startDate, Math.round(span * ((k + L.frac) / Math.max(x, 1))));
-        if (L.frac >= 1) {
-          events.push({ date: d, type: 'work', text: `${L.name}: выполнено ${fmtNum(L.done)} ${L.unit}`, who: c.short });
-          if (L.group === 'earth' && rnd() > 0.35) {
-            const kU = (0.95 + rnd() * 0.04).toFixed(2);
-            events.push({ date: addDays(d, 1), type: 'lab', text: `Лаборатория: коэффициент уплотнения ${kU.replace('.', ',')} (норма ≥ 0,95)`, who: 'Лаборатория' });
-          }
-        } else {
-          events.push({ date: d, type: 'progress', text: `${L.name}: в работе, ${Math.round(L.frac * 100)}%`, who: c.short });
-        }
-      });
-      events.push({ date: lastSurvey, type: 'geo', text: 'Исполнительная геодезическая съёмка', who: 'WestSurvey' });
-      if (delayed) events.push({ date: addDays(TODAY, -2), type: 'warn', text: 'Отставание от графика: нехватка самосвалов на вывозке грунта', who: 'Технадзор' });
-    }
-    events.sort((a, b) => b.date - a.date);
-
-    const pk = String(i);
-    const docsGeo = started
-      ? [
-          { name: fmtFile(pk, 'Акт разбивки ПК {pk}.pdf'), date: startDate, size: '1,2 МБ' },
-          { name: fmtFile(pk, 'Исполнительная съёмка ПК {pk}.dwg'), date: lastSurvey, size: '3,8 МБ' },
-          ...(p > 0.5 ? [{ name: fmtFile(pk, 'Продольный профиль ПК {pk}.pdf'), date: addDays(lastSurvey, -14), size: '0,9 МБ' }] : []),
-        ]
-      : [];
-    const docsLab = layers
-      .filter((L) => L.frac >= 1 && L.group === 'earth')
-      .slice(-3)
-      .map((L) => ({ name: `Протокол уплотнения — ${L.short}.pdf`, date: addDays(startDate, Math.round(rnd() * 40)), size: '0,4 МБ' }));
-    if (layers[6].frac > 0) docsLab.push({ name: 'Гранулометрический состав щебня.pdf', date: addDays(lastSurvey, -3), size: '0,6 МБ' });
-
-    const photoCount = started ? 2 + Math.floor(rnd() * 4) : 0;
-    const photos = Array.from({ length: photoCount }, (_, k) => ({
-      date: addDays(lastSurvey || TODAY, -k * 9),
-      caption: pick(['Отсыпка насыпи', 'Уплотнение катком', 'Планировка автогрейдером', 'Разбивка оси', 'Устройство щебня', 'Общий вид участка']),
-      tone: k % 4,
-    }));
-
-    const doneVolume = layers.filter((L) => L.unit === 'м³').reduce((s, L) => s + L.done, 0);
-    const designVolume = layers.filter((L) => L.unit === 'м³').reduce((s, L) => s + L.design, 0);
-
+    if (staked) events.push({ date: TODAY, type: 'geo', text: 'Геодезическая разбивка выполнена', who: 'WestSurvey' });
+    works.forEach((w) => events.push({ date: TODAY, type: 'progress', text: `${w.text}: в работе на ПК ${w.from} – ПК ${w.to}`, who: c.short }));
+    const status = started ? 'work' : 'none';
     pickets.push({
-      i, pk, label: `ПК ${i} – ${i + 1}`, km: (i + 1) / 10, contractor: c, progress: p, status, delayed,
-      plan: Math.min(1, p + (delayed ? 0.045 : started ? 0.008 : 0)),
-      layers, stages, current, startDate, started, lastSurvey, nextSurvey, machinery, workers,
-      events, docsGeo, docsLab, photos, doneVolume, designVolume,
-      note: delayed ? 'Отставание от графика на 6 дней. Подрядчику направлено предписание.' : p === 1 ? 'Работы на пикете завершены, замечаний нет.' : '',
+      i, pk: String(i), label: `ПК ${i} – ${i + 1}`, km: (i + 1) / 10, contractor: c, progress: 0, plan: 0, status, delayed: false,
+      layers, stages, current, startDate: TODAY, started, lastSurvey: staked ? TODAY : null, nextSurvey: null,
+      machinery: [], workers: 0, events,
+      docsGeo: staked ? [{ name: `Акт разбивки ПК ${i}`, date: TODAY, size: '—' }] : [],
+      docsLab: [], photos: [],
+      doneVolume: 0, designVolume: layers.filter((L) => L.unit === 'м³').reduce((s, L) => s + L.design, 0),
+      note: works.length ? works.map((w) => `${w.text} на ПК ${w.from} – ПК ${w.to}, объём не внесён`).join('. ') : '',
     });
   }
   return pickets;
